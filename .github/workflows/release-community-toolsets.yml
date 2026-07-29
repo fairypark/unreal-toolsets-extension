@@ -1,0 +1,92 @@
+name: Draft CommunityToolsetsExtension release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/community-toolsets-v')
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
+      - unreal-engine-5.8
+    timeout-minutes: 45
+    environment: community-toolsets-release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out the selected tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify protected release inputs
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace("${{ vars.UE_5_8_ROOT }}")) {
+            throw "Repository variable UE_5_8_ROOT is required."
+          }
+          $tagCommit = (git rev-list -n 1 $env:GITHUB_REF_NAME).Trim()
+          if ($tagCommit -ne $env:GITHUB_SHA) {
+            throw "Selected tag does not resolve to the checked-out commit."
+          }
+          $notes = Join-Path $env:GITHUB_WORKSPACE (
+            "docs\releases\$($env:GITHUB_REF_NAME).md"
+          )
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) {
+            throw "Release notes not found: $notes"
+          }
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            throw "A GitHub Release already exists for $env:GITHUB_REF_NAME."
+          }
+
+      - name: Run repository tests
+        shell: powershell
+        run: python -m unittest discover -s tests -v
+
+      - name: Build release inputs
+        shell: powershell
+        env:
+          ENGINE_ROOT: ${{ vars.UE_5_8_ROOT }}
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP (
+            "community-toolsets-release-$env:GITHUB_RUN_ID"
+          )
+          powershell.exe -NoProfile -ExecutionPolicy Bypass `
+            -File .\scripts\build-unreal-extension-github-release.ps1 `
+            -EngineRoot $env:ENGINE_ROOT `
+            -OutputDirectory $output `
+            -SourceCommit $env:GITHUB_SHA `
+            -EngineVersionLabel "UE5.8" `
+            -TargetPlatforms "Win64"
+          "RELEASE_ASSET_DIRECTORY=$output" | Out-File `
+            -FilePath $env:GITHUB_ENV `
+            -Encoding utf8 `
+            -Append
+
+      - name: Create draft GitHub Release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $descriptor = Get-Content -Raw `
+            .\CommunityToolsetsExtension.uplugin | ConvertFrom-Json
+          $notes = Join-Path $env:GITHUB_WORKSPACE (
+            "docs\releases\$($env:GITHUB_REF_NAME).md"
+          )
+          $assets = Get-ChildItem -LiteralPath $env:RELEASE_ASSET_DIRECTORY -File |
+            ForEach-Object { $_.FullName }
+          gh release create $env:GITHUB_REF_NAME `
+            --draft `
+            --verify-tag `
+            --title "Community Toolsets Extension $($descriptor.VersionName)" `
+            --notes-file $notes `
+            $assets

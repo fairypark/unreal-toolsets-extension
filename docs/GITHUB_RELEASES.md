@@ -1,0 +1,133 @@
+# GitHub distribution for CommunityToolsetsExtension
+
+Distribute the Unreal runtime extension through a client-neutral GitHub
+repository and GitHub Releases. The recommended repository name is
+`unreal-community-toolsets-extension`.
+
+Claude, Codex, and other MCP users should all use this same Unreal plugin
+repository and its release assets.
+
+## Repository boundary
+
+The standalone repository should contain:
+
+- `CommunityToolsetsExtension.uplugin`
+- `Source/`
+- `Config/`
+- `.github/workflows/`
+- `scripts/`
+- `docs/`
+- `LICENSE`
+- release notes and packaging scripts
+
+Do not include:
+
+- Epic Engine or official plugin files
+- `Intermediate`, `Saved`, Derived Data Cache, or host projects
+- a private `.uproject`, `.mcp.json`, user paths, or MCP credentials
+- binaries for an Engine version or platform that was not built and tested
+- client marketplace metadata or client-specific runtime naming
+
+Keep the Unreal plugin identifier, module, schemas, errors, archives, and
+release titles client-neutral. Client-specific setup belongs in separate
+documentation sections.
+
+## Version and tag policy
+
+- Plugin semantic version: `0.1.0`
+- Git tag: `community-toolsets-v0.1.0`
+- Release title: `Community Toolsets Extension 0.1.0`
+- Binary asset:
+  `CommunityToolsetsExtension-0.1.0-UE5.8-Win64.zip`
+- Checksum:
+  `CommunityToolsetsExtension-0.1.0-UE5.8-Win64.zip.sha256`
+
+Use a new plugin version when reflected schemas or runtime behavior change.
+Rebuilding the same source for another Engine or platform may add a distinctly
+named asset to the same release after that combination passes the complete
+validation matrix.
+
+## Prepare release assets
+
+Run from a clean checkout at the exact commit that the Git tag will reference:
+
+```powershell
+$commit = git rev-parse HEAD
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\build-unreal-extension-github-release.ps1 `
+  -EngineRoot "C:\Program Files\Epic Games\UE_5.8" `
+  -OutputDirectory "C:\release\community-toolsets-v0.1.0" `
+  -SourceCommit $commit `
+  -EngineVersionLabel "UE5.8" `
+  -TargetPlatforms "Win64"
+```
+
+The script refuses to overwrite an output or staging directory. It produces a
+ZIP with a top-level `CommunityToolsetsExtension` folder, a SHA-256 file, and a
+machine-readable manifest that binds the asset to the source commit, plugin
+version, Engine label, and target platform.
+
+## Release gate
+
+Before publishing:
+
+1. Confirm the source commit is clean, reviewed, and tagged.
+2. Run repository tests and official Skill/Plugin validation where applicable.
+3. Run Unreal `BuildPlugin` from a clean staging package.
+4. Install the binary package into a disposable project.
+5. Run `AI.LandscapeExtensionToolset.Contract`.
+6. Discover `LandscapeExtensionToolset` through a live Unreal MCP server.
+7. Exercise Landscape inspection and mutations on disposable test data,
+   including invalid source, invalid resolution, rollback, save failure, and
+   World Partition refusal cases.
+8. Compare the ZIP hash with its `.sha256` file.
+9. Confirm the ZIP contains no `Intermediate`, `Saved`, private paths, project
+   assets, or official Epic plugin files.
+
+Do not advertise an Engine or platform as supported until all applicable gates
+pass for that combination.
+
+## Publish with GitHub CLI
+
+Create the release only after GitHub authentication and repository ownership
+have been confirmed:
+
+```powershell
+gh release create community-toolsets-v0.1.0 `
+  --repo <owner>/unreal-community-toolsets-extension `
+  --title "Community Toolsets Extension 0.1.0" `
+  --notes-file .\docs\releases\community-toolsets-v0.1.0.md `
+  C:\release\community-toolsets-v0.1.0\*.zip `
+  C:\release\community-toolsets-v0.1.0\*.sha256 `
+  C:\release\community-toolsets-v0.1.0\release-manifest.json
+```
+
+For a first public release, create it as a draft, inspect the rendered notes and
+assets, then publish it. Do not upload from a dirty checkout or silently replace
+an existing binary under the same asset name.
+
+## GitHub Actions
+
+Repository-only tests can run on GitHub-hosted runners. Unreal binary packaging
+must run on a controlled Windows runner that has the declared Unreal Engine
+version and toolchain installed.
+
+Never run untrusted pull-request code on that self-hosted Unreal runner. Limit
+binary release jobs to protected tags or manually approved workflows, use a
+GitHub Environment for release approval, and grant `contents: write` only to
+the release job.
+
+The included workflows implement that split:
+
+- `.github/workflows/validate.yml` runs repository tests on
+  `windows-latest` and never invokes Unreal.
+- `.github/workflows/release-community-toolsets.yml` runs only when manually
+  dispatched with a `community-toolsets-v*` tag selected. It requires the
+  `community-toolsets-release` Environment, a self-hosted runner labeled
+  `Windows`, `X64`, and `unreal-engine-5.8`, and a repository variable named
+  `UE_5_8_ROOT`.
+
+Configure required reviewers on the `community-toolsets-release` Environment.
+The workflow creates a draft GitHub Release so a maintainer can inspect its
+notes, ZIP, checksum, and manifest before publication.

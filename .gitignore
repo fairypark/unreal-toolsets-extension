@@ -1,0 +1,16 @@
+/Binaries/
+/Intermediate/
+/Saved/
+/DerivedDataCache/
+/.vs/
+/.idea/
+/.vscode/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+__pycache__/
+*.py[cod]
+/release-assets/

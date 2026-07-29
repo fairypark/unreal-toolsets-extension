@@ -1,0 +1,48 @@
+name: Validate repository
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run repository tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Parse PowerShell release scripts
+        shell: powershell
+        run: |
+          $scripts = @(
+            "scripts\package-unreal-extension.ps1",
+            "scripts\build-unreal-extension-github-release.ps1"
+          )
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              throw "PowerShell parse failed for $script`: $($errors.Message -join '; ')"
+            }
+          }
