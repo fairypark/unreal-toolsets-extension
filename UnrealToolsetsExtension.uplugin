@@ -1,0 +1,35 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Unreal Toolsets Extension",
+  "Description": "Independent, unofficial ToolsetRegistry extensions that complement, but never modify, Epic's Unreal Engine toolsets.",
+  "Category": "AI",
+  "CreatedBy": "Project Maintainers",
+  "CreatedByURL": "https://github.com/fairypark/unreal-toolsets-extension",
+  "DocsURL": "https://github.com/fairypark/unreal-toolsets-extension",
+  "CanContainContent": false,
+  "EditorOnly": true,
+  "IsBetaVersion": true,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "UnrealToolsetsExtension",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": [
+        "Editor"
+      ]
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "ToolsetRegistry",
+      "Enabled": true
+    },
+    {
+      "Name": "PCG",
+      "Enabled": true
+    }
+  ]
+}

@@ -1,16 +1,22 @@
 #include "LandscapeExtensionToolset.h"
 
 #include "Editor.h"
+#include "EngineUtils.h"
 #include "FileHelpers.h"
 #include "HAL/FileManager.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LandscapeComponent.h"
+#include "LandscapeConfigHelper.h"
 #include "LandscapeDataAccess.h"
 #include "LandscapeEdit.h"
 #include "LandscapeEditLayer.h"
 #include "LandscapeFileFormatInterface.h"
 #include "LandscapeImportHelper.h"
 #include "LandscapeInfo.h"
+#include "LandscapeStreamingProxy.h"
+#include "LandscapeSubsystem.h"
+#include "Misc/DateTime.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "ScopedTransaction.h"
 #include "UObject/Package.h"
@@ -53,6 +59,61 @@ namespace LandscapeExtensionToolsetPrivate
 		}
 
 		return true;
+	}
+
+	bool ResolveLandscapeOrAutoSelect(
+		UWorld* World,
+		ALandscapeProxy* Input,
+		ULandscapeInfo*& OutInfo,
+		ALandscape*& OutLandscape,
+		FString& OutError)
+	{
+		if (IsValid(Input))
+		{
+			return ResolveLandscape(Input, OutInfo, OutLandscape, OutError);
+		}
+		if (!IsValid(World) || World->WorldType != EWorldType::Editor)
+		{
+			OutError = TEXT("World must reference an Editor world when Landscape is omitted.");
+			return false;
+		}
+
+		TArray<ALandscape*> Candidates;
+		for (TActorIterator<ALandscape> It(World); It; ++It)
+		{
+			if (IsValid(*It))
+			{
+				Candidates.AddUnique(*It);
+			}
+		}
+		if (Candidates.Num() != 1)
+		{
+			OutError = FString::Printf(
+				TEXT("Automatic Landscape selection requires exactly one canonical Landscape; found %d."),
+				Candidates.Num());
+			return false;
+		}
+		return ResolveLandscape(Candidates[0], OutInfo, OutLandscape, OutError);
+	}
+
+	int32 CountLoadedStreamingProxies(ULandscapeInfo* Info)
+	{
+		int32 Count = 0;
+		for (const TWeakObjectPtr<ALandscapeStreamingProxy>& Proxy : Info->GetSortedStreamingProxies())
+		{
+			if (Proxy.IsValid())
+			{
+				++Count;
+			}
+		}
+		return Count;
+	}
+
+	int32 GetGridSizeComponents(ULandscapeInfo* Info, ALandscape* Landscape)
+	{
+		return Info->ComponentSizeQuads > 0
+			? static_cast<int32>(Landscape->GetGridSize() / Info->ComponentSizeQuads)
+			: 0;
 	}
 
 	bool ResolveExtent(
@@ -619,6 +680,264 @@ namespace LandscapeExtensionToolsetPrivate
 		return true;
 	}
 
+	struct FDecodedLayerReimport
+	{
+		ULandscapeLayerInfoObject* LayerInfo = nullptr;
+		FGuid EditLayerGuid;
+		FString ResolvedSource;
+		TArray<uint8> ImportedData;
+	};
+
+	FLandscapeExtensionReimportPreflight BuildReimportPreflight(
+		UWorld* World,
+		ALandscapeProxy* InputLandscape,
+		const FLandscapeExtensionReimportRequest& Request,
+		ULandscapeInfo*& OutInfo,
+		ALandscape*& OutLandscape,
+		FIntRect& OutExtent,
+		FGuid& OutHeightEditLayerGuid,
+		FString& OutResolvedHeightSource,
+		TArray<uint16>& OutHeightData,
+		TArray<FDecodedLayerReimport>& OutLayers)
+	{
+		FLandscapeExtensionReimportPreflight Result;
+		FString Error;
+		if (!ResolveLandscapeOrAutoSelect(
+			World,
+			InputLandscape,
+			OutInfo,
+			OutLandscape,
+			Error))
+		{
+			Result.Errors.Add(Error);
+			return Result;
+		}
+
+		Result.Landscape = OutLandscape;
+		Result.bWorldPartition = OutLandscape->GetWorld()->IsPartitionedWorld();
+		Result.PreservedTransform = OutLandscape->LandscapeActorToWorld();
+		Result.PreservedStreamingProxyCount = CountLoadedStreamingProxies(OutInfo);
+		Result.PreservedGridSizeComponents = GetGridSizeComponents(OutInfo, OutLandscape);
+		if (UMaterialInterface* Material = OutLandscape->GetLandscapeMaterial())
+		{
+			Result.PreservedMaterialPath = Material->GetPathName();
+		}
+
+		FLandscapeExtensionRegion FullRegion;
+		if (!ResolveExtent(OutInfo, FullRegion, OutExtent, Error))
+		{
+			Result.Errors.Add(Error);
+			return Result;
+		}
+		Result.bAllComponentsLoaded = true;
+		Result.VertexResolution = FIntPoint(OutExtent.Width() + 1, OutExtent.Height() + 1);
+
+		if (!ParseEditLayerGuid(
+			OutLandscape,
+			Request.HeightDestinationEditLayerGuid,
+			true,
+			OutHeightEditLayerGuid,
+			Error))
+		{
+			Result.Errors.Add(Error);
+		}
+
+		FString HeightSource = Request.HeightmapSourceFile;
+		if (HeightSource.IsEmpty())
+		{
+			HeightSource = OutLandscape->ReimportHeightmapFilePath;
+		}
+		if (HeightSource.IsEmpty())
+		{
+			Result.Errors.Add(TEXT("HeightmapSourceFile is empty and the Landscape has no recorded reimport source."));
+		}
+		else
+		{
+			TArray<FString> DecodeWarnings;
+			if (!DecodeHeightmap(
+				HeightSource,
+				Request.bFlipHeightmapYAxis,
+				OutExtent,
+				OutHeightData,
+				DecodeWarnings,
+				OutResolvedHeightSource,
+				Error))
+			{
+				Result.Errors.Add(Error);
+			}
+			else
+			{
+				FLandscapeExtensionValidatedFile File;
+				File.Kind = TEXT("Heightmap");
+				File.ResolvedFile = OutResolvedHeightSource;
+				File.Resolution = Result.VertexResolution;
+				Result.ValidatedFiles.Add(File);
+
+				if (!OutLandscape->ReimportHeightmapFilePath.IsEmpty())
+				{
+					FString RecordedSource = FPaths::ConvertRelativePathToFull(
+						FPaths::ProjectDir(),
+						OutLandscape->ReimportHeightmapFilePath);
+					FPaths::NormalizeFilename(RecordedSource);
+					if (!RecordedSource.Equals(OutResolvedHeightSource, ESearchCase::IgnoreCase))
+					{
+						Result.Errors.Add(
+							TEXT("Heightmap source does not match the Landscape's recorded source. Use ImportHeightmap to replace the source."));
+					}
+				}
+			}
+			Result.Warnings.Append(DecodeWarnings);
+		}
+
+		TSet<ULandscapeLayerInfoObject*> SeenLayerInfos;
+		for (const FLandscapeExtensionLayerReimportRequest& LayerRequest : Request.LayerMaps)
+		{
+			if (!IsValid(LayerRequest.LayerInfo)
+				|| OutInfo->GetLayerInfoIndex(LayerRequest.LayerInfo) == INDEX_NONE)
+			{
+				Result.Errors.Add(TEXT("Every LayerMaps entry must reference a LayerInfo assigned to the Landscape."));
+				continue;
+			}
+			if (SeenLayerInfos.Contains(LayerRequest.LayerInfo))
+			{
+				Result.Errors.Add(FString::Printf(
+					TEXT("LayerInfo %s appears more than once in the batch."),
+					*LayerRequest.LayerInfo->GetPathName()));
+				continue;
+			}
+			SeenLayerInfos.Add(LayerRequest.LayerInfo);
+
+			FDecodedLayerReimport Decoded;
+			Decoded.LayerInfo = LayerRequest.LayerInfo;
+			if (!ParseEditLayerGuid(
+				OutLandscape,
+				LayerRequest.DestinationEditLayerGuid,
+				true,
+				Decoded.EditLayerGuid,
+				Error))
+			{
+				Result.Errors.Add(Error);
+				continue;
+			}
+
+			TArray<FString> DecodeWarnings;
+			if (!DecodeWeightmap(
+				LayerRequest.SourceFile,
+				LayerRequest.bFlipYAxis,
+				LayerRequest.LayerInfo->GetLayerName(),
+				OutExtent,
+				Decoded.ImportedData,
+				DecodeWarnings,
+				Decoded.ResolvedSource,
+				Error))
+			{
+				Result.Errors.Add(FString::Printf(
+					TEXT("%s: %s"),
+					*LayerRequest.LayerInfo->GetLayerName().ToString(),
+					*Error));
+				continue;
+			}
+			Result.Warnings.Append(DecodeWarnings);
+
+			FLandscapeExtensionValidatedFile File;
+			File.Kind = TEXT("LayerMap");
+			File.LayerName = LayerRequest.LayerInfo->GetLayerName().ToString();
+			File.ResolvedFile = Decoded.ResolvedSource;
+			File.Resolution = Result.VertexResolution;
+			Result.ValidatedFiles.Add(File);
+			OutLayers.Add(MoveTemp(Decoded));
+		}
+
+		Result.bReady = Result.Errors.IsEmpty();
+		return Result;
+	}
+
+	bool SaveRawBytes(const FString& FilePath, const void* Data, int64 ByteCount)
+	{
+		TArray<uint8> Bytes;
+		Bytes.Append(static_cast<const uint8*>(Data), ByteCount);
+		return FFileHelper::SaveArrayToFile(Bytes, *FilePath);
+	}
+
+	bool CreateReimportDataBackup(
+		ULandscapeInfo* Info,
+		ALandscape* Landscape,
+		const FIntRect& Extent,
+		const FGuid& HeightEditLayerGuid,
+		const TArray<FDecodedLayerReimport>& Layers,
+		FString& OutBackupDirectory,
+		FString& OutError)
+	{
+		const FString BackupName = FString::Printf(
+			TEXT("%s-%s-%s"),
+			*Info->LandscapeGuid.ToString(EGuidFormats::Digits),
+			*FDateTime::UtcNow().ToString(TEXT("%Y%m%dT%H%M%SZ")),
+			*FGuid::NewGuid().ToString(EGuidFormats::Digits));
+		OutBackupDirectory = FPaths::Combine(
+			FPaths::ProjectSavedDir(),
+			TEXT("UnrealToolsetsExtension"),
+			TEXT("LandscapeBackups"),
+			BackupName);
+		FPaths::NormalizeDirectoryName(OutBackupDirectory);
+		if (!IFileManager::Get().MakeDirectory(*OutBackupDirectory, true))
+		{
+			OutError = FString::Printf(TEXT("Failed to create backup directory: %s"), *OutBackupDirectory);
+			return false;
+		}
+
+		TArray<uint16> HeightData;
+		ReadHeightData(Info, HeightEditLayerGuid, Extent, HeightData);
+		const FString HeightFile = FPaths::Combine(OutBackupDirectory, TEXT("height-before.r16"));
+		if (!SaveRawBytes(HeightFile, HeightData.GetData(), HeightData.Num() * sizeof(uint16)))
+		{
+			OutError = FString::Printf(TEXT("Failed to save height backup: %s"), *HeightFile);
+			return false;
+		}
+
+		TArray<FString> ManifestLines = {
+			FString::Printf(TEXT("Landscape=%s"), *Landscape->GetPathName()),
+			FString::Printf(TEXT("LandscapeGuid=%s"), *Info->LandscapeGuid.ToString(EGuidFormats::DigitsWithHyphens)),
+			FString::Printf(TEXT("Resolution=%dx%d"), Extent.Width() + 1, Extent.Height() + 1),
+			FString::Printf(TEXT("Transform=%s"), *Landscape->LandscapeActorToWorld().ToHumanReadableString()),
+			FString::Printf(
+				TEXT("Material=%s"),
+				IsValid(Landscape->GetLandscapeMaterial())
+					? *Landscape->GetLandscapeMaterial()->GetPathName()
+					: TEXT(""))
+		};
+
+		for (int32 Index = 0; Index < Layers.Num(); ++Index)
+		{
+			const FDecodedLayerReimport& Layer = Layers[Index];
+			TArray<uint8> WeightData;
+			ReadWeightData(Info, Layer.EditLayerGuid, Layer.LayerInfo, Extent, WeightData);
+			FString SafeLayerName = Layer.LayerInfo->GetLayerName().ToString();
+			FPaths::MakeValidFileName(SafeLayerName);
+			const FString WeightFile = FPaths::Combine(
+				OutBackupDirectory,
+				FString::Printf(TEXT("%02d-%s-before.r8"), Index, *SafeLayerName));
+			if (!FFileHelper::SaveArrayToFile(WeightData, *WeightFile))
+			{
+				OutError = FString::Printf(TEXT("Failed to save layer backup: %s"), *WeightFile);
+				return false;
+			}
+			ManifestLines.Add(FString::Printf(
+				TEXT("Layer[%d]=%s|%s|%s"),
+				Index,
+				*Layer.LayerInfo->GetPathName(),
+				*Layer.EditLayerGuid.ToString(EGuidFormats::DigitsWithHyphens),
+				*FPaths::GetCleanFilename(WeightFile)));
+		}
+
+		const FString ManifestFile = FPaths::Combine(OutBackupDirectory, TEXT("manifest.txt"));
+		if (!FFileHelper::SaveStringArrayToFile(ManifestLines, *ManifestFile))
+		{
+			OutError = FString::Printf(TEXT("Failed to save backup manifest: %s"), *ManifestFile);
+			return false;
+		}
+		return true;
+	}
+
 	void ModifyLandscapeObjects(ULandscapeInfo* Info)
 	{
 		Info->ForEachLandscapeProxy([](ALandscapeProxy* Proxy)
@@ -1022,6 +1341,214 @@ FLandscapeExtensionMutationResult ULandscapeExtensionToolset::ReimportHeightmap(
 	return LandscapeExtensionToolsetPrivate::ApplyHeightmap(Landscape, Request, true);
 }
 
+FLandscapeExtensionReimportPreflight ULandscapeExtensionToolset::PreflightReimportLandscapeData(
+	UWorld* World,
+	ALandscapeProxy* Landscape,
+	const FLandscapeExtensionReimportRequest& Request)
+{
+	using namespace LandscapeExtensionToolsetPrivate;
+	ULandscapeInfo* Info = nullptr;
+	ALandscape* MainLandscape = nullptr;
+	FIntRect Extent;
+	FGuid HeightEditLayerGuid;
+	FString ResolvedHeightSource;
+	TArray<uint16> HeightData;
+	TArray<FDecodedLayerReimport> Layers;
+	return BuildReimportPreflight(
+		World,
+		Landscape,
+		Request,
+		Info,
+		MainLandscape,
+		Extent,
+		HeightEditLayerGuid,
+		ResolvedHeightSource,
+		HeightData,
+		Layers);
+}
+
+FLandscapeExtensionMutationResult ULandscapeExtensionToolset::ReimportLandscapeData(
+	UWorld* World,
+	ALandscapeProxy* InputLandscape,
+	const FLandscapeExtensionReimportRequest& Request)
+{
+	using namespace LandscapeExtensionToolsetPrivate;
+	FLandscapeExtensionMutationResult Result;
+	Result.Operation = TEXT("ReimportLandscapeData");
+	Result.bDryRun = Request.bDryRun;
+
+	ULandscapeInfo* Info = nullptr;
+	ALandscape* Landscape = nullptr;
+	FIntRect Extent;
+	FGuid HeightEditLayerGuid;
+	FString ResolvedHeightSource;
+	TArray<uint16> ImportedHeightData;
+	TArray<FDecodedLayerReimport> Layers;
+	const FLandscapeExtensionReimportPreflight Preflight = BuildReimportPreflight(
+		World,
+		InputLandscape,
+		Request,
+		Info,
+		Landscape,
+		Extent,
+		HeightEditLayerGuid,
+		ResolvedHeightSource,
+		ImportedHeightData,
+		Layers);
+
+	Result.Landscape = Landscape;
+	Result.SourceFile = ResolvedHeightSource;
+	Result.Warnings = Preflight.Warnings;
+	Result.ValidationMessages.Append(Preflight.Errors);
+	for (const FLandscapeExtensionValidatedFile& File : Preflight.ValidatedFiles)
+	{
+		Result.ValidationMessages.Add(FString::Printf(
+			TEXT("%s %s validated at %dx%d: %s"),
+			*File.Kind,
+			*File.LayerName,
+			File.Resolution.X,
+			File.Resolution.Y,
+			*File.ResolvedFile));
+	}
+
+	if (!Preflight.bReady)
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_REIMPORT_PREFLIGHT_FAILED"),
+			FString::Join(Preflight.Errors, TEXT(" | ")));
+		return {};
+	}
+	if (Request.bDryRun)
+	{
+		Result.ValidationMessages.Add(
+			TEXT("Dry-run passed. No package was saved, no backup was created, and no Landscape data was changed."));
+		return Result;
+	}
+
+	TArray<UPackage*> Packages;
+	FString Error;
+	if (!SaveRecoveryPoint(Info, Packages, Result.RecoveryPackagePaths, Error))
+	{
+		RaiseError(TEXT("LANDSCAPE_EXTENSION_RECOVERY_SAVE_FAILED"), Error);
+		return {};
+	}
+
+	TArray<uint16> OriginalHeightData;
+	ReadHeightData(Info, HeightEditLayerGuid, Extent, OriginalHeightData);
+	TArray<TArray<uint8>> OriginalLayerData;
+	OriginalLayerData.SetNum(Layers.Num());
+	for (int32 Index = 0; Index < Layers.Num(); ++Index)
+	{
+		ReadWeightData(
+			Info,
+			Layers[Index].EditLayerGuid,
+			Layers[Index].LayerInfo,
+			Extent,
+			OriginalLayerData[Index]);
+	}
+	Result.BeforeHeight = BuildStatistics(Landscape, Extent, OriginalHeightData);
+
+	if (Request.bCreateDataBackup)
+	{
+		if (!CreateReimportDataBackup(
+			Info,
+			Landscape,
+			Extent,
+			HeightEditLayerGuid,
+			Layers,
+			Result.BackupDirectory,
+			Error))
+		{
+			RaiseError(TEXT("LANDSCAPE_EXTENSION_DATA_BACKUP_FAILED"), Error);
+			return {};
+		}
+		Result.bBackupCreated = true;
+	}
+
+	const FTransform PreservedTransform = Landscape->LandscapeActorToWorld();
+	UMaterialInterface* const PreservedMaterial = Landscape->GetLandscapeMaterial();
+	const int32 PreservedProxyCount = CountLoadedStreamingProxies(Info);
+	const int32 PreservedGridSizeComponents = GetGridSizeComponents(Info, Landscape);
+
+	{
+		const FScopedTransaction Transaction(
+			FText::FromString(TEXT("Unreal Toolsets Extension Reimport Landscape Data")));
+		ModifyLandscapeObjects(Info);
+		WriteHeightData(Info, HeightEditLayerGuid, Extent, ImportedHeightData);
+		for (const FDecodedLayerReimport& Layer : Layers)
+		{
+			WriteWeightData(
+				Info,
+				Layer.EditLayerGuid,
+				Layer.LayerInfo,
+				Extent,
+				Layer.ImportedData);
+		}
+		Landscape->ReimportHeightmapFilePath = ResolvedHeightSource;
+		Landscape->MarkPackageDirty();
+	}
+
+	auto RestoreOriginalData = [&]()
+	{
+		WriteHeightData(Info, HeightEditLayerGuid, Extent, OriginalHeightData);
+		for (int32 Index = 0; Index < Layers.Num(); ++Index)
+		{
+			WriteWeightData(
+				Info,
+				Layers[Index].EditLayerGuid,
+				Layers[Index].LayerInfo,
+				Extent,
+				OriginalLayerData[Index]);
+		}
+	};
+
+	TArray<uint16> VerifiedHeightData;
+	ReadHeightData(Info, HeightEditLayerGuid, Extent, VerifiedHeightData);
+	bool bVerified = VerifyExact(ImportedHeightData, VerifiedHeightData);
+	for (const FDecodedLayerReimport& Layer : Layers)
+	{
+		TArray<uint8> VerifiedLayerData;
+		ReadWeightData(Info, Layer.EditLayerGuid, Layer.LayerInfo, Extent, VerifiedLayerData);
+		bVerified &= VerifyExact(Layer.ImportedData, VerifiedLayerData);
+	}
+	bVerified &=
+		Landscape->LandscapeActorToWorld().Equals(PreservedTransform)
+		&& Landscape->GetLandscapeMaterial() == PreservedMaterial
+		&& CountLoadedStreamingProxies(Info) == PreservedProxyCount
+		&& GetGridSizeComponents(Info, Landscape) == PreservedGridSizeComponents;
+
+	if (!bVerified)
+	{
+		RestoreOriginalData();
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_BATCH_VERIFY_FAILED_ROLLED_BACK"),
+			TEXT("Height, layer, transform, material, or World Partition state failed verification; original height and layer data were restored. Reload the recovery packages if non-data state changed."));
+		return {};
+	}
+
+	Result.AfterHeight = BuildStatistics(Landscape, Extent, VerifiedHeightData);
+	Result.ModifiedPackagePaths = GetPackagePaths(Packages);
+	Result.ValidationMessages.Add(TEXT("Transform, material, Landscape layout, height range, representative samples, and every imported layer verified."));
+
+	if (Request.bSaveAfterSuccess && !SavePackages(Packages, Result.SaveResult, Error))
+	{
+		RestoreOriginalData();
+		FLandscapeExtensionSaveResult RollbackSave;
+		FString RollbackError;
+		const bool bRollbackSaved = SavePackages(Packages, RollbackSave, RollbackError);
+		RaiseError(
+			bRollbackSaved
+				? TEXT("LANDSCAPE_EXTENSION_BATCH_SAVE_FAILED_ROLLED_BACK")
+				: TEXT("LANDSCAPE_EXTENSION_BATCH_SAVE_FAILED_RELOAD_REQUIRED"),
+			bRollbackSaved
+				? Error
+				: FString::Printf(TEXT("%s Rollback save failed: %s"), *Error, *RollbackError));
+		return {};
+	}
+
+	return Result;
+}
+
 FLandscapeExtensionMutationResult ULandscapeExtensionToolset::ImportWeightmap(
 	ALandscapeProxy* InputLandscape,
 	ULandscapeLayerInfoObject* LayerInfo,
@@ -1322,6 +1849,262 @@ FLandscapeExtensionBuildingPadValidation ULandscapeExtensionToolset::ValidateBui
 	Result.bWithinHeightVariation =
 		Result.HeightVariationCentimeters <= Request.MaxHeightVariationCentimeters;
 	Result.bWithinSlope = Result.BestFitSlopeDegrees <= Request.MaxSlopeDegrees;
+	return Result;
+}
+
+FLandscapeExtensionProxyAudit ULandscapeExtensionToolset::AuditStreamingProxies(
+	ALandscapeProxy* InputLandscape,
+	const FLandscapeExtensionProxyAuditRequest& Request)
+{
+	using namespace LandscapeExtensionToolsetPrivate;
+	if (Request.MinimumComponentsPerProxy < 1 || Request.MaximumExpectedProxyCount < 1)
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_AUDIT_REQUEST_INVALID"),
+			TEXT("MinimumComponentsPerProxy and MaximumExpectedProxyCount must be positive."));
+		return {};
+	}
+
+	ULandscapeInfo* Info = nullptr;
+	ALandscape* Landscape = nullptr;
+	FString Error;
+	if (!ResolveLandscape(InputLandscape, Info, Landscape, Error))
+	{
+		RaiseError(TEXT("LANDSCAPE_EXTENSION_TARGET_INVALID"), Error);
+		return {};
+	}
+
+	FLandscapeExtensionProxyAudit Result;
+	Result.bWorldPartition = Landscape->GetWorld()->IsPartitionedWorld();
+	Result.CurrentGridSizeComponents = GetGridSizeComponents(Info, Landscape);
+	Result.RecommendedGridSizeComponents = Result.CurrentGridSizeComponents;
+
+	FIntRect Extent;
+	if (!Info->GetLandscapeExtent(Extent))
+	{
+		RaiseError(TEXT("LANDSCAPE_EXTENSION_EXTENT_UNAVAILABLE"), TEXT("The Landscape has no loaded extent."));
+		return {};
+	}
+	Result.bAllComponentsLoaded = !Info->HasUnloadedComponentsInRegion(
+		Extent.Min.X,
+		Extent.Min.Y,
+		Extent.Max.X,
+		Extent.Max.Y);
+
+	Info->ForAllLandscapeComponents([&Result](ULandscapeComponent* Component)
+	{
+		if (IsValid(Component))
+		{
+			++Result.LoadedComponentCount;
+		}
+	});
+
+	for (const TWeakObjectPtr<ALandscapeStreamingProxy>& WeakProxy : Info->GetSortedStreamingProxies())
+	{
+		ALandscapeStreamingProxy* Proxy = WeakProxy.Get();
+		if (!IsValid(Proxy))
+		{
+			continue;
+		}
+		FLandscapeExtensionProxyRecord Record;
+		Record.Proxy = Proxy;
+		Record.ComponentCount = Proxy->LandscapeComponents.Num();
+		if (!Proxy->LandscapeComponents.IsEmpty())
+		{
+			Record.MinSectionBase = Proxy->LandscapeComponents[0]->GetSectionBase();
+			Record.MaxSectionBase = Record.MinSectionBase;
+			for (ULandscapeComponent* Component : Proxy->LandscapeComponents)
+			{
+				if (IsValid(Component))
+				{
+					const FIntPoint SectionBase = Component->GetSectionBase();
+					Record.MinSectionBase.X = FMath::Min(Record.MinSectionBase.X, SectionBase.X);
+					Record.MinSectionBase.Y = FMath::Min(Record.MinSectionBase.Y, SectionBase.Y);
+					Record.MaxSectionBase.X = FMath::Max(Record.MaxSectionBase.X, SectionBase.X);
+					Record.MaxSectionBase.Y = FMath::Max(Record.MaxSectionBase.Y, SectionBase.Y);
+				}
+			}
+		}
+		Result.Proxies.Add(Record);
+	}
+	Result.LoadedProxyCount = Result.Proxies.Num();
+	Result.MeanComponentsPerProxy = Result.LoadedProxyCount > 0
+		? static_cast<double>(Result.LoadedComponentCount) / Result.LoadedProxyCount
+		: static_cast<double>(Result.LoadedComponentCount);
+
+	if (!Result.bWorldPartition)
+	{
+		Result.Findings.Add(TEXT("This Landscape is not World Partition grid-based; streaming proxy reconstruction is not applicable."));
+		return Result;
+	}
+	if (!Result.bAllComponentsLoaded)
+	{
+		Result.Findings.Add(TEXT("The audit is partial because some Landscape components are unloaded. Load the full Landscape before planning a rebuild."));
+	}
+
+	const bool bTooManyProxies = Result.LoadedProxyCount > Request.MaximumExpectedProxyCount;
+	const bool bSparseProxies = Result.LoadedProxyCount > 1
+		&& Result.MeanComponentsPerProxy < Request.MinimumComponentsPerProxy;
+	Result.bPotentiallyOverPartitioned = bTooManyProxies || bSparseProxies;
+	if (Result.bPotentiallyOverPartitioned)
+	{
+		Result.RecommendedGridSizeComponents = FMath::Clamp(
+			FMath::Max(1, Result.CurrentGridSizeComponents * 2),
+			1,
+			32);
+		Result.Findings.Add(FString::Printf(
+			TEXT("Potential over-partitioning: %d loaded proxies average %.2f components each. The suggested grid size %d is a review starting point, not an automatic performance target."),
+			Result.LoadedProxyCount,
+			Result.MeanComponentsPerProxy,
+			Result.RecommendedGridSizeComponents));
+	}
+	else
+	{
+		Result.Findings.Add(TEXT("No threshold-based over-partitioning signal was found. Keep the current grid unless measured streaming behavior justifies a change."));
+	}
+	Result.Findings.Add(TEXT("Landscape resolution and playable extent are independent from streaming grid size; reserve terrain does not require one proxy per small area."));
+	return Result;
+}
+
+FLandscapeExtensionProxyRebuildResult ULandscapeExtensionToolset::RebuildStreamingProxies(
+	ALandscapeProxy* InputLandscape,
+	const FLandscapeExtensionProxyRebuildRequest& Request)
+{
+	using namespace LandscapeExtensionToolsetPrivate;
+	ULandscapeInfo* Info = nullptr;
+	ALandscape* Landscape = nullptr;
+	FString Error;
+	if (!ResolveLandscape(InputLandscape, Info, Landscape, Error))
+	{
+		RaiseError(TEXT("LANDSCAPE_EXTENSION_TARGET_INVALID"), Error);
+		return {};
+	}
+	if (!Landscape->GetWorld()->IsPartitionedWorld())
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_REBUILD_NOT_PARTITIONED"),
+			TEXT("Streaming proxy rebuild requires a World Partition Landscape."));
+		return {};
+	}
+	if (Request.NewGridSizeComponents < 1 || Request.NewGridSizeComponents > 32)
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_GRID_INVALID"),
+			TEXT("NewGridSizeComponents must be between 1 and 32."));
+		return {};
+	}
+
+	FIntRect Extent;
+	if (!Info->GetLandscapeExtent(Extent)
+		|| Info->HasUnloadedComponentsInRegion(
+			Extent.Min.X,
+			Extent.Min.Y,
+			Extent.Max.X,
+			Extent.Max.Y))
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_REBUILD_PARTIAL"),
+			TEXT("Every Landscape component must be loaded before rebuilding streaming proxies."));
+		return {};
+	}
+
+	FLandscapeExtensionProxyRebuildResult Result;
+	Result.bDryRun = Request.bDryRun;
+	Result.PreviousGridSizeComponents = GetGridSizeComponents(Info, Landscape);
+	Result.NewGridSizeComponents = Request.NewGridSizeComponents;
+	Result.PreviousProxyCount = CountLoadedStreamingProxies(Info);
+	Result.NewProxyCount = Result.PreviousProxyCount;
+
+	if (Request.ExpectedCurrentGridSizeComponents != Result.PreviousGridSizeComponents)
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_PLAN_STALE"),
+			FString::Printf(
+				TEXT("Expected grid size %d but current grid size is %d. Re-run AuditStreamingProxies."),
+				Request.ExpectedCurrentGridSizeComponents,
+				Result.PreviousGridSizeComponents));
+		return {};
+	}
+	if (Request.NewGridSizeComponents == Result.PreviousGridSizeComponents)
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_GRID_UNCHANGED"),
+			TEXT("NewGridSizeComponents matches the current grid; no rebuild is needed."));
+		return {};
+	}
+	if (Request.bDryRun)
+	{
+		Result.Warnings.Add(TEXT("Dry-run passed. No proxy, component, package, or grid setting was changed."));
+		return Result;
+	}
+	if (Request.Confirmation != TEXT("REBUILD_LANDSCAPE_STREAMING_PROXIES"))
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_CONFIRMATION_REQUIRED"),
+			TEXT("Confirmation must equal REBUILD_LANDSCAPE_STREAMING_PROXIES."));
+		return {};
+	}
+
+	TArray<UPackage*> RecoveryPackages;
+	if (!SaveRecoveryPoint(Info, RecoveryPackages, Result.RecoveryPackagePaths, Error))
+	{
+		RaiseError(TEXT("LANDSCAPE_EXTENSION_RECOVERY_SAVE_FAILED"), Error);
+		return {};
+	}
+
+	TSet<AActor*> ActorsToDelete;
+	{
+		const FScopedTransaction Transaction(
+			FText::FromString(TEXT("Unreal Toolsets Extension Rebuild Landscape Streaming Proxies")));
+		ModifyLandscapeObjects(Info);
+		if (!FLandscapeConfigHelper::ChangeGridSize(
+			Info,
+			static_cast<uint32>(Request.NewGridSizeComponents),
+			ActorsToDelete))
+		{
+			RaiseError(
+				TEXT("LANDSCAPE_EXTENSION_PROXY_REBUILD_FAILED"),
+				TEXT("The Engine rejected the requested Landscape grid change."));
+			return {};
+		}
+		for (AActor* ActorToDelete : ActorsToDelete)
+		{
+			ALandscapeStreamingProxy* ProxyToDelete = Cast<ALandscapeStreamingProxy>(ActorToDelete);
+			if (!IsValid(ProxyToDelete) || !ProxyToDelete->LandscapeComponents.IsEmpty())
+			{
+				RaiseError(
+					TEXT("LANDSCAPE_EXTENSION_PROXY_DELETE_GUARD_FAILED"),
+					TEXT("The Engine requested deletion of an invalid or non-empty proxy. Reload the recovery packages."));
+				return {};
+			}
+			Landscape->GetWorld()->DestroyActor(ProxyToDelete);
+		}
+	}
+
+	Info->ForceLayersFullUpdate();
+	Result.NewProxyCount = CountLoadedStreamingProxies(Info);
+	if (GetGridSizeComponents(Info, Landscape) != Request.NewGridSizeComponents)
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_REBUILD_VERIFY_FAILED"),
+			TEXT("The Landscape did not retain the requested grid size. Reload the recovery packages."));
+		return {};
+	}
+
+	TArray<UPackage*> ModifiedPackages;
+	GatherLandscapePackages(Info, ModifiedPackages);
+	for (UPackage* Package : RecoveryPackages)
+	{
+		ModifiedPackages.AddUnique(Package);
+	}
+	if (Request.bSaveAfterSuccess && !SavePackages(ModifiedPackages, Result.SaveResult, Error))
+	{
+		RaiseError(
+			TEXT("LANDSCAPE_EXTENSION_PROXY_SAVE_FAILED_RELOAD_REQUIRED"),
+			FString::Printf(TEXT("%s Reload recovery packages: %s"), *Error, *FString::Join(Result.RecoveryPackagePaths, TEXT(", "))));
+		return {};
+	}
+	Result.Warnings.Add(TEXT("Re-run AuditStreamingProxies and validate streaming, Data Layers, materials, collision, and representative Landscape samples before accepting the rebuild."));
 	return Result;
 }
 

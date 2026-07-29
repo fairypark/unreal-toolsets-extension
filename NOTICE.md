@@ -1,6 +1,6 @@
 # Notices
 
-Community Toolsets Extension is an independent community project. It is not
+Unreal Toolsets Extension is an independent, unofficial open-source project. It is not
 affiliated with or endorsed by Epic Games, OpenAI, or Anthropic.
 
 Unreal and Unreal Engine are trademarks or registered trademarks of Epic

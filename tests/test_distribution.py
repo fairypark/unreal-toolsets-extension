@@ -10,22 +10,23 @@ PLUGIN_ROOT = REPO_ROOT
 class UnrealExtensionDistributionTests(unittest.TestCase):
     def test_descriptor_is_editor_only_and_independent_of_all_toolsets(self):
         descriptor = json.loads(
-            (PLUGIN_ROOT / "CommunityToolsetsExtension.uplugin").read_text(encoding="utf-8")
+            (PLUGIN_ROOT / "UnrealToolsetsExtension.uplugin").read_text(encoding="utf-8")
         )
         self.assertTrue(descriptor["EditorOnly"])
-        self.assertEqual("CommunityToolsetsExtension", descriptor["Modules"][0]["Name"])
+        self.assertEqual("UnrealToolsetsExtension", descriptor["Modules"][0]["Name"])
         dependencies = {item["Name"] for item in descriptor["Plugins"]}
         self.assertIn("ToolsetRegistry", dependencies)
+        self.assertIn("PCG", dependencies)
         self.assertNotIn("AllToolsets", dependencies)
         self.assertNotIn("ModelContextProtocol", dependencies)
 
-    def test_module_registers_domain_toolset(self):
+    def test_module_registers_domain_toolsets(self):
         module = (
             PLUGIN_ROOT
             / "Source"
-            / "CommunityToolsetsExtension"
+            / "UnrealToolsetsExtension"
             / "Private"
-            / "CommunityToolsetsExtensionModule.cpp"
+            / "UnrealToolsetsExtensionModule.cpp"
         ).read_text(encoding="utf-8")
         self.assertIn(
             "RegisterToolsetClass(ULandscapeExtensionToolset::StaticClass())", module
@@ -33,12 +34,32 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         self.assertIn(
             "UnregisterToolsetClass(ULandscapeExtensionToolset::StaticClass())", module
         )
+        self.assertIn(
+            "RegisterToolsetClass(UPlacementExtensionToolset::StaticClass())", module
+        )
+        self.assertIn(
+            "UnregisterToolsetClass(UPlacementExtensionToolset::StaticClass())", module
+        )
+        self.assertIn(
+            "RegisterToolsetClass(UPCGExtensionToolset::StaticClass())", module
+        )
+        self.assertIn(
+            "UnregisterToolsetClass(UPCGExtensionToolset::StaticClass())", module
+        )
+        self.assertIn(
+            "RegisterToolsetClass(ULandscapeGrassExtensionToolset::StaticClass())",
+            module,
+        )
+        self.assertIn(
+            "UnregisterToolsetClass(ULandscapeGrassExtensionToolset::StaticClass())",
+            module,
+        )
 
-    def test_public_contract_contains_nine_typed_tools(self):
+    def test_public_contract_contains_typed_p0_tools(self):
         header = (
             PLUGIN_ROOT
             / "Source"
-            / "CommunityToolsetsExtension"
+            / "UnrealToolsetsExtension"
             / "Public"
             / "LandscapeExtensionToolset.h"
         ).read_text(encoding="utf-8")
@@ -51,10 +72,114 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "SetLandscapeMaterial",
             "GetHeightStatistics",
             "ValidateBuildingPad",
+            "PreflightReimportLandscapeData",
+            "ReimportLandscapeData",
+            "AuditStreamingProxies",
+            "RebuildStreamingProxies",
             "SaveLandscape",
         ):
             self.assertIn(f"{tool_name}(", header)
-        self.assertEqual(9, header.count("meta = (AICallable)"))
+        self.assertEqual(13, header.count("meta = (AICallable)"))
+
+        placement_header = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Public"
+            / "PlacementExtensionToolset.h"
+        ).read_text(encoding="utf-8")
+        self.assertIn("SnapActorToGround(", placement_header)
+        self.assertEqual(1, placement_header.count("meta = (AICallable)"))
+
+    def test_snap_to_ground_contract_is_diagnostic_and_self_safe(self):
+        header = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Public"
+            / "PlacementExtensionToolset.h"
+        ).read_text(encoding="utf-8")
+        implementation = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Private"
+            / "PlacementExtensionToolset.cpp"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "TraceChannel",
+            "bPreferLandscape",
+            "bLandscapeOnly",
+            "bUseActorBoundsBottom",
+            "HitActor",
+            "HitLocation",
+            "HitNormal",
+            "AppliedDeltaZCentimeters",
+        ):
+            self.assertIn(required, header)
+        self.assertIn("QueryParams.AddIgnoredActor(Actor)", implementation)
+        self.assertIn("PLACEMENT_EXTENSION_NO_GROUND_HIT", implementation)
+        self.assertNotIn("8000.0", implementation)
+
+    def test_pcg_extension_has_structured_weighted_mesh_crud_and_audit(self):
+        header = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Public"
+            / "PCGExtensionToolset.h"
+        ).read_text(encoding="utf-8")
+        implementation = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Private"
+            / "PCGExtensionToolset.cpp"
+        ).read_text(encoding="utf-8")
+        for function_name in (
+            "GetWeightedMeshEntries",
+            "ReplaceWeightedMeshEntries",
+            "AddWeightedMeshEntry",
+            "UpdateWeightedMeshEntry",
+            "RemoveWeightedMeshEntry",
+            "ReorderWeightedMeshEntry",
+            "AuditGraphInstance",
+        ):
+            self.assertIn(f"{function_name}(", header)
+        self.assertEqual(7, header.count("meta = (AICallable)"))
+        self.assertIn("UPCGMeshSelectorWeighted", implementation)
+        self.assertIn("ForEachConstManagedResource", implementation)
+        self.assertIn("GetHeightAtLocation", implementation)
+
+    def test_landscape_grass_extension_has_structured_variety_crud(self):
+        header = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Public"
+            / "LandscapeGrassExtensionToolset.h"
+        ).read_text(encoding="utf-8")
+        implementation = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Private"
+            / "LandscapeGrassExtensionToolset.cpp"
+        ).read_text(encoding="utf-8")
+        for function_name in (
+            "GetGrassVarieties",
+            "ReplaceGrassVarieties",
+            "AddGrassVariety",
+            "UpdateGrassVariety",
+            "RemoveGrassVariety",
+            "ReorderGrassVariety",
+            "SetGrassDensityScaling",
+        ):
+            self.assertIn(f"{function_name}(", header)
+        self.assertEqual(7, header.count("meta = (AICallable)"))
+        self.assertIn("FScopedTransaction", implementation)
+        self.assertIn("MarkPackageDirty", implementation)
+        self.assertNotIn("SavePackage", implementation)
 
     def test_distribution_has_no_personal_project_constants(self):
         scanned = []
@@ -82,7 +207,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
 
     def test_runtime_brand_is_mcp_client_neutral(self):
         descriptor = (
-            PLUGIN_ROOT / "CommunityToolsetsExtension.uplugin"
+            PLUGIN_ROOT / "UnrealToolsetsExtension.uplugin"
         ).read_text(encoding="utf-8")
         readme = (PLUGIN_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("Codex", descriptor)
@@ -107,7 +232,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         for required in (
             'ValidatePattern("^[0-9a-fA-F]{40}$")',
-            "CommunityToolsetsExtension-$pluginVersion-$safeEngineLabel-$safePlatforms",
+            "UnrealToolsetsExtension-$pluginVersion-$safeEngineLabel-$safePlatforms",
             "Get-FileHash -LiteralPath $assetPath -Algorithm SHA256",
             '"release-manifest.json"',
             "sourceCommit = $SourceCommit.ToLowerInvariant()",
@@ -122,8 +247,8 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             encoding="utf-8"
         )
         for required in (
-            "unreal-community-toolsets-extension",
-            "community-toolsets-v0.1.0",
+            "unreal-toolsets-extension",
+            "unreal-toolsets-v0.1.0",
             "Claude, Codex, and other MCP users",
             "protected tags",
             "Never run untrusted pull-request code",
@@ -140,16 +265,16 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             REPO_ROOT
             / ".github"
             / "workflows"
-            / "release-community-toolsets.yml"
+            / "release-unreal-toolsets.yml"
         ).read_text(encoding="utf-8")
         self.assertIn("pull_request:", validation)
         self.assertIn("runs-on: windows-latest", validation)
         self.assertNotIn("self-hosted", validation)
         for required in (
             "workflow_dispatch:",
-            "startsWith(github.ref, 'refs/tags/community-toolsets-v')",
+            "startsWith(github.ref, 'refs/tags/unreal-toolsets-v')",
             "self-hosted",
-            "environment: community-toolsets-release",
+            "environment: unreal-toolsets-release",
             "UE_5_8_ROOT",
             "--draft",
             "--verify-tag",

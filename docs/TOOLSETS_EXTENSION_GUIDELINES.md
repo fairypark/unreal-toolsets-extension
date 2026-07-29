@@ -1,4 +1,4 @@
-# CommunityToolsetsExtension design guidelines
+# UnrealToolsetsExtension design guidelines
 
 Use these rules for every toolset added to this distributable Unreal plugin.
 
@@ -13,7 +13,7 @@ Use these rules for every toolset added to this distributable Unreal plugin.
 ## 2. Keep ownership separate
 
 - Never modify Engine plugin files, `AllToolsets.uplugin`, or an installed Epic binary.
-- Keep extension code in the project or distributed `CommunityToolsetsExtension` plugin.
+- Keep extension code in the project or distributed `UnrealToolsetsExtension` plugin.
 - Depend directly on `ToolsetRegistry`; do not require the `AllToolsets` aggregator.
 - Name domain classes `U<Domain>ExtensionToolset` so future official classes cannot collide.
 - Keep one domain toolset per file pair and register each class explicitly in the extension module.

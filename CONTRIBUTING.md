@@ -28,7 +28,7 @@ Build a clean Unreal package:
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\package-unreal-extension.ps1 `
   -EngineRoot "C:\Program Files\Epic Games\UE_5.8" `
-  -OutputDirectory "C:\tmp\CommunityToolsetsExtension"
+  -OutputDirectory "C:\tmp\UnrealToolsetsExtension"
 ```
 
 See `docs/TOOLSETS_EXTENSION_GUIDELINES.md` for the complete design and review

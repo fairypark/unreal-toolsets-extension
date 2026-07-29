@@ -1,8 +1,8 @@
 using UnrealBuildTool;
 
-public class CommunityToolsetsExtension : ModuleRules
+public class UnrealToolsetsExtension : ModuleRules
 {
-	public CommunityToolsetsExtension(ReadOnlyTargetRules Target) : base(Target)
+	public UnrealToolsetsExtension(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -13,6 +13,7 @@ public class CommunityToolsetsExtension : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"Landscape",
+				"PCG",
 				"ToolsetRegistry"
 			});
 

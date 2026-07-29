@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$pluginPath = Join-Path $repositoryRoot "CommunityToolsetsExtension.uplugin"
+$pluginPath = Join-Path $repositoryRoot "UnrealToolsetsExtension.uplugin"
 $runUat = Join-Path $EngineRoot "Engine\Build\BatchFiles\RunUAT.bat"
 $resolvedOutput = [IO.Path]::GetFullPath($OutputDirectory)
 
@@ -56,4 +56,4 @@ if (Test-Path -LiteralPath $intermediateDirectory -PathType Container) {
     Remove-Item -LiteralPath $intermediateDirectory -Recurse -Force
 }
 
-Write-Output "Packaged CommunityToolsetsExtension: $resolvedOutput"
+Write-Output "Packaged UnrealToolsetsExtension: $resolvedOutput"

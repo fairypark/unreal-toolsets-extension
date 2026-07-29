@@ -17,11 +17,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$pluginDescriptor = Join-Path $repositoryRoot "CommunityToolsetsExtension.uplugin"
+$pluginDescriptor = Join-Path $repositoryRoot "UnrealToolsetsExtension.uplugin"
 $packageScript = Join-Path $PSScriptRoot "package-unreal-extension.ps1"
 $resolvedOutput = [IO.Path]::GetFullPath($OutputDirectory)
 $stagingRoot = "$resolvedOutput.staging"
-$packageDirectory = Join-Path $stagingRoot "CommunityToolsetsExtension"
+$packageDirectory = Join-Path $stagingRoot "UnrealToolsetsExtension"
 
 if (-not (Test-Path -LiteralPath $pluginDescriptor -PathType Leaf)) {
     throw "Plugin descriptor not found: $pluginDescriptor"
@@ -65,7 +65,7 @@ if ([string]::IsNullOrWhiteSpace($pluginVersion)) {
 
 $safeEngineLabel = $EngineVersionLabel -replace "[^A-Za-z0-9._-]", "-"
 $safePlatforms = $TargetPlatforms -replace "[^A-Za-z0-9._+-]", "-"
-$assetBaseName = "CommunityToolsetsExtension-$pluginVersion-$safeEngineLabel-$safePlatforms"
+$assetBaseName = "UnrealToolsetsExtension-$pluginVersion-$safeEngineLabel-$safePlatforms"
 $assetFileName = "$assetBaseName.zip"
 $assetPath = Join-Path $resolvedOutput $assetFileName
 $checksumFileName = "$assetFileName.sha256"
@@ -97,7 +97,7 @@ try {
 
     $manifest = [ordered]@{
         schemaVersion = 1
-        pluginName = "CommunityToolsetsExtension"
+        pluginName = "UnrealToolsetsExtension"
         pluginVersion = $pluginVersion
         sourceCommit = $SourceCommit.ToLowerInvariant()
         engineVersion = $EngineVersionLabel

@@ -1,8 +1,9 @@
-# Community Toolsets Extension
+# Unreal Toolsets Extension
 
-[![Validate repository](https://github.com/fairypark/unreal-community-toolsets-extension/actions/workflows/validate.yml/badge.svg)](https://github.com/fairypark/unreal-community-toolsets-extension/actions/workflows/validate.yml)
+[![Validate repository](https://github.com/fairypark/unreal-toolsets-extension/actions/workflows/validate.yml/badge.svg)](https://github.com/fairypark/unreal-toolsets-extension/actions/workflows/validate.yml)
 
-`CommunityToolsetsExtension` is a distributable Unreal Editor plugin for typed
+`UnrealToolsetsExtension` is an independent, unofficial, distributable Unreal
+Editor plugin for typed
 ToolsetRegistry capabilities that are missing from the official Unreal toolsets.
 It complements Epic plugins without modifying or replacing them.
 
@@ -11,22 +12,51 @@ discovers the registered toolsets, Claude, Codex, and any other compatible MCP
 client can call the same typed operations. No runtime API is tied to a Codex
 installation.
 
-The first domain toolset is `LandscapeExtensionToolset`, which exposes:
+`LandscapeExtensionToolset` exposes:
 
 - `GetLandscapeInfo`
 - `CreateLandscape`
 - `ImportHeightmap`
 - `ReimportHeightmap`
+- `PreflightReimportLandscapeData`
+- `ReimportLandscapeData`
 - `ImportWeightmap`
 - `SetLandscapeMaterial`
 - `GetHeightStatistics`
 - `ValidateBuildingPad`
+- `AuditStreamingProxies`
+- `RebuildStreamingProxies`
 - `SaveLandscape`
+
+`PlacementExtensionToolset` exposes:
+
+- `SnapActorToGround`
+
+`PCGExtensionToolset` complements the official generic PCG node tools with:
+
+- `GetWeightedMeshEntries`
+- `ReplaceWeightedMeshEntries`
+- `AddWeightedMeshEntry`
+- `UpdateWeightedMeshEntry`
+- `RemoveWeightedMeshEntry`
+- `ReorderWeightedMeshEntry`
+- `AuditGraphInstance`
+
+`LandscapeGrassExtensionToolset` provides typed `LandscapeGrassType` editing:
+
+- `GetGrassVarieties`
+- `ReplaceGrassVarieties`
+- `AddGrassVariety`
+- `UpdateGrassVariety`
+- `RemoveGrassVariety`
+- `ReorderGrassVariety`
+- `SetGrassDensityScaling`
 
 ## Requirements
 
 - Unreal Engine 5.8 for version `0.1.0`
 - the experimental `ToolsetRegistry` plugin
+- the built-in `PCG` plugin
 - an Editor target
 
 Win64 packaging was verified with Unreal Engine 5.8. Other Engine versions and
@@ -45,7 +75,7 @@ From the repository root:
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\package-unreal-extension.ps1 `
   -EngineRoot "C:\Program Files\Epic Games\UE_5.8" `
-  -OutputDirectory "C:\short-path\CommunityToolsetsExtension"
+  -OutputDirectory "C:\short-path\UnrealToolsetsExtension"
 ```
 
 Use a short output path on Windows because Unreal intermediate paths can exceed
@@ -60,13 +90,13 @@ Engine version and platform from GitHub Releases. Verify it against the
 published `.sha256` file before extraction. Do not use a binary built for a
 different Engine version.
 
-1. Copy the packaged `CommunityToolsetsExtension` folder to:
+1. Copy the packaged `UnrealToolsetsExtension` folder to:
 
    ```text
-   <Project>/Plugins/CommunityToolsetsExtension
+   <Project>/Plugins/UnrealToolsetsExtension
    ```
 
-2. Enable `CommunityToolsetsExtension` in the project. Do not edit
+2. Enable `UnrealToolsetsExtension` in the project. Do not edit
    `Engine/Plugins/Experimental/Toolsets/AllToolsets/AllToolsets.uplugin`.
 3. Restart the Editor after adding a packaged binary plugin.
 4. When using MCP, start the server and run:
@@ -75,7 +105,9 @@ different Engine version.
    ModelContextProtocol.RefreshTools
    ```
 
-5. Confirm `list_toolsets` contains `LandscapeExtensionToolset`.
+5. Confirm `list_toolsets` contains `LandscapeExtensionToolset`,
+   `LandscapeGrassExtensionToolset`, `PlacementExtensionToolset`, and
+   `PCGExtensionToolset`.
 
 ## Safety and current limits
 
@@ -87,6 +119,29 @@ different Engine version.
 - Reimport validates the recorded source, saves a recovery point, captures the
   original height data, verifies the complete write plus representative points,
   and rolls back on failure.
+- Batch reimport supports preflight and dry-run validation for one RAW16
+  heightmap plus RAW8 Landscape layer maps while preserving transform,
+  material, component layout, and loaded streaming-proxy layout.
+- Streaming-proxy audit is read-only. Rebuild requires a matching prior audit,
+  a dry run, an explicit confirmation token, complete loaded coverage, and a
+  durable recovery save.
+- Ground snapping ignores the moved Actor and its attachments, supports
+  caller-selected trace channels and negative world heights, can prefer or
+  require Landscape hits, aligns the Actor bounds bottom, and reports the
+  selected hit and applied delta.
+- PCG weighted mesh editing uses typed, index-checked CRUD operations instead
+  of generic JSON array mutation. It defaults bulk placement entries to the
+  `NoCollision` profile unless the caller explicitly selects another valid
+  profile.
+- PCG audit is read-only. It reports managed ISM/HISM instance counts, mesh,
+  collision, navigation, cull distances, sampled Landscape coverage and
+  grounding ratios, plus likely empty-output causes without regenerating or
+  cleaning the graph.
+- Landscape Grass variety edits are typed, transactional, and index-checked.
+  They validate mesh loading, density, jitter, cull distances, LOD, and scale
+  ranges, then mark the asset package dirty without saving it. Replacing a
+  variety intentionally resets per-platform and per-quality overrides to the
+  supplied defaults.
 - No tool uses Slate UI automation.
 
 Follow `docs/TOOLSETS_EXTENSION_GUIDELINES.md` when adding another domain
