@@ -21,7 +21,9 @@ public class UnrealToolsetsExtension : ModuleRules
 			new string[]
 			{
 				"Foliage",
+				"Fab",
 				"LandscapeEditor",
+				"Projects",
 				"UnrealEd"
 			});
 	}

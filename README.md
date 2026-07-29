@@ -52,11 +52,21 @@ installation.
 - `ReorderGrassVariety`
 - `SetGrassDensityScaling`
 
+`FabExtensionToolset` provides guarded, read-only inspection through Fab's
+public C++ interfaces:
+
+- `GetFabIntegrationInfo`
+- `GetFabCacheSummary`
+- `ListFabCachedEntries`
+- `GetFabCacheEntryStatus`
+- `GetFabImportTypeSupport`
+
 ## Requirements
 
 - Unreal Engine 5.8 for version `0.1.0`
 - the experimental `ToolsetRegistry` plugin
 - the built-in `PCG` plugin
+- the built-in `Fab` plugin
 - an Editor target
 
 Win64 packaging was verified with Unreal Engine 5.8. Other Engine versions and
@@ -106,8 +116,8 @@ different Engine version.
    ```
 
 5. Confirm `list_toolsets` contains `LandscapeExtensionToolset`,
-   `LandscapeGrassExtensionToolset`, `PlacementExtensionToolset`, and
-   `PCGExtensionToolset`.
+   `LandscapeGrassExtensionToolset`, `PlacementExtensionToolset`,
+   `PCGExtensionToolset`, and `FabExtensionToolset`.
 
 ## Safety and current limits
 
@@ -142,6 +152,11 @@ different Engine version.
   ranges, then mark the asset package dirty without saving it. Replacing a
   variety intentionally resets per-platform and per-quality overrides to the
   supplied defaults.
+- Fab inspection uses only the public Fab module, cache, and workflow-factory
+  interfaces. It reads top-level cached ZIP metadata and exact import-type
+  registration without inspecting authentication, querying marketplace
+  services, inferring ownership, downloading content, installing plugins, or
+  clearing the cache.
 - No tool uses Slate UI automation.
 
 Follow `docs/TOOLSETS_EXTENSION_GUIDELINES.md` when adding another domain

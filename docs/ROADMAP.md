@@ -41,6 +41,14 @@ implemented against public Unreal APIs.
 - transactional density-scaling control
 - package-dirty mutation without implicit asset saves
 
+### FabExtensionToolset
+
+- read-only Fab plugin version, enablement, module, and commandlet state
+- cache directory, total size, top-level ZIP count, and modification range
+- bounded, prefix-filtered cached-entry listing and exact entry lookup
+- exact asset-type checks through Fab's public workflow factory registry
+- no authentication, marketplace, entitlement, download, install, or deletion access
+
 ## Under evaluation
 
 ### Landscape and placement follow-ups
@@ -52,15 +60,7 @@ implemented against public Unreal APIs.
 - generated PCG fixture coverage for non-empty HISM output and Landscape ratios
 - Landscape material Grass Output binding and shader-recompile fixtures
 
-### FabExtensionToolset
-
-The first viable Fab scope is read-only integration and cache inspection:
-
-- `GetFabIntegrationInfo`
-- `GetFabCacheSummary`
-- `ListFabCachedEntries`
-- `GetFabCacheEntryStatus`
-- `GetFabImportTypeSupport`
+### Fab follow-ups
 
 Marketplace search, My Library synchronization, ownership checks, signed URL
 generation, Add to Project, and plugin installation are not planned until Epic

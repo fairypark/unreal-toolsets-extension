@@ -79,8 +79,8 @@ Before publishing:
 5. Run the complete `AI.UnrealToolsetsExtension` automation group.
 6. Confirm the packaged plugin registers `LandscapeExtensionToolset`,
    `LandscapeGrassExtensionToolset`, `PlacementExtensionToolset`, and
-   `PCGExtensionToolset`.
-7. Discover all four toolsets through a live Unreal MCP server.
+   `PCGExtensionToolset`, and `FabExtensionToolset`.
+7. Discover all five toolsets through a live Unreal MCP server.
 8. Exercise Landscape inspection and mutations on disposable test data,
    including invalid source, invalid resolution, rollback, save failure, and
    World Partition refusal cases.
@@ -90,8 +90,12 @@ Before publishing:
     non-empty HISM result against a disposable Landscape.
 11. Exercise Landscape Grass variety CRUD and density-scaling changes on a
     disposable asset, including invalid mesh, index, and range cases.
-12. Compare the ZIP hash with its `.sha256` file.
-13. Confirm the ZIP contains no `Intermediate`, `Saved`, private paths, project
+12. Exercise Fab integration, empty and populated cache inspection, invalid
+    cache ids, and registered/unregistered import-type queries. Confirm that
+    responses expose no cookies, tokens, authentication state, entitlements,
+    marketplace responses, or download controls.
+13. Compare the ZIP hash with its `.sha256` file.
+14. Confirm the ZIP contains no `Intermediate`, `Saved`, private paths, project
    assets, or official Epic plugin files.
 
 Do not advertise an Engine or platform as supported until all applicable gates

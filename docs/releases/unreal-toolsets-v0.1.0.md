@@ -47,12 +47,20 @@ file.
 - `ReorderGrassVariety`
 - `SetGrassDensityScaling`
 
+`FabExtensionToolset` provides:
+
+- `GetFabIntegrationInfo`
+- `GetFabCacheSummary`
+- `ListFabCachedEntries`
+- `GetFabCacheEntryStatus`
+- `GetFabImportTypeSupport`
+
 ## Compatibility
 
 - Verified Engine: Unreal Engine 5.8.1
 - Verified platform: Win64 Editor
 - Required Engine plugin: `ToolsetRegistry`
-- Required built-in plugin: `PCG`
+- Required built-in plugins: `PCG`, `Fab`
 - Optional transport plugin: `ModelContextProtocol`
 - Compatible clients: any MCP client that can connect to Unreal's MCP server,
   including Claude and Codex
@@ -93,6 +101,11 @@ mesh, density, jitter, cull-distance, LOD, and scale validation. It marks the
 asset package dirty without saving it. Replacing a variety resets its
 per-platform and per-quality overrides to the supplied defaults.
 
+Fab operations are read-only and use the public Fab module, cache, and workflow
+factory registry. They do not inspect authentication, call marketplace
+services, infer ownership, download content, install plugins, or clear the
+cache.
+
 `CreateLandscape` does not yet create World Partition streaming proxies and
 therefore rejects partitioned worlds. No runtime tool drives Slate UI.
 
@@ -106,6 +119,8 @@ therefore rejects partitioned worlds. No runtime tool drives Slate UI.
 - `AI.UnrealToolsetsExtension.PCG.WeightedMeshEntries`: passed
 - `AI.UnrealToolsetsExtension.PCG.EmptyGraphAudit`: passed
 - `AI.UnrealToolsetsExtension.LandscapeGrass.Varieties`: passed
+- `AI.UnrealToolsetsExtension.Fab.ReadOnlyInspection`: passed
+- `AI.UnrealToolsetsExtension.Fab.Validation`: passed
 - Repository unit tests: passed
 - Standalone repository tests and release-script validation: passed
 
@@ -113,3 +128,5 @@ Live MCP discovery, exact RAW16/RAW8 mutation fixtures, rollback/save-failure
 injection, World Partition rebuild scenarios, and a non-empty generated PCG
 HISM audit, plus Landscape material Grass Output binding fixtures, must be
 completed before the draft release is promoted to a final public release.
+Live MCP validation must also confirm Fab cache responses contain no
+authentication or entitlement data.

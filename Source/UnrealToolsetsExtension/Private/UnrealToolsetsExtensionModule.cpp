@@ -3,6 +3,7 @@
 
 #include "LandscapeExtensionToolset.h"
 #include "LandscapeGrassExtensionToolset.h"
+#include "FabExtensionToolset.h"
 #include "PCGExtensionToolset.h"
 #include "PlacementExtensionToolset.h"
 
@@ -13,6 +14,7 @@ public:
 	{
 		UToolsetRegistry::RegisterToolsetClass(ULandscapeExtensionToolset::StaticClass());
 		UToolsetRegistry::RegisterToolsetClass(ULandscapeGrassExtensionToolset::StaticClass());
+		UToolsetRegistry::RegisterToolsetClass(UFabExtensionToolset::StaticClass());
 		UToolsetRegistry::RegisterToolsetClass(UPlacementExtensionToolset::StaticClass());
 		UToolsetRegistry::RegisterToolsetClass(UPCGExtensionToolset::StaticClass());
 	}
@@ -21,6 +23,7 @@ public:
 	{
 		UToolsetRegistry::UnregisterToolsetClass(UPCGExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(UPlacementExtensionToolset::StaticClass());
+		UToolsetRegistry::UnregisterToolsetClass(UFabExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(ULandscapeGrassExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(ULandscapeExtensionToolset::StaticClass());
 	}

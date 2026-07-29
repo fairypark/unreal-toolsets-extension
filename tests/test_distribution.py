@@ -17,6 +17,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         dependencies = {item["Name"] for item in descriptor["Plugins"]}
         self.assertIn("ToolsetRegistry", dependencies)
         self.assertIn("PCG", dependencies)
+        self.assertIn("Fab", dependencies)
         self.assertNotIn("AllToolsets", dependencies)
         self.assertNotIn("ModelContextProtocol", dependencies)
 
@@ -53,6 +54,12 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         self.assertIn(
             "UnregisterToolsetClass(ULandscapeGrassExtensionToolset::StaticClass())",
             module,
+        )
+        self.assertIn(
+            "RegisterToolsetClass(UFabExtensionToolset::StaticClass())", module
+        )
+        self.assertIn(
+            "UnregisterToolsetClass(UFabExtensionToolset::StaticClass())", module
         )
 
     def test_public_contract_contains_typed_p0_tools(self):
@@ -180,6 +187,48 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         self.assertIn("FScopedTransaction", implementation)
         self.assertIn("MarkPackageDirty", implementation)
         self.assertNotIn("SavePackage", implementation)
+
+    def test_fab_extension_is_read_only_and_uses_public_surfaces(self):
+        header = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Public"
+            / "FabExtensionToolset.h"
+        ).read_text(encoding="utf-8")
+        implementation = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Private"
+            / "FabExtensionToolset.cpp"
+        ).read_text(encoding="utf-8")
+        for function_name in (
+            "GetFabIntegrationInfo",
+            "GetFabCacheSummary",
+            "ListFabCachedEntries",
+            "GetFabCacheEntryStatus",
+            "GetFabImportTypeSupport",
+        ):
+            self.assertIn(f"{function_name}(", header)
+        self.assertEqual(5, header.count("meta = (AICallable)"))
+        for public_surface in (
+            "Utilities/FabAssetsCache.h",
+            "FabWorkflowFactoryRegistry.h",
+            "IPluginManager",
+        ):
+            self.assertIn(public_surface, implementation)
+        for forbidden in (
+            "FabAuthentication",
+            "FabBrowserApi",
+            "FFabDownloadRequest",
+            "ClearCache(",
+            "DeleteDirectory",
+            "Http",
+            "Cookie",
+            "Token",
+        ):
+            self.assertNotIn(forbidden, implementation)
 
     def test_distribution_has_no_personal_project_constants(self):
         scanned = []

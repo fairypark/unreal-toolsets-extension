@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "FabExtensionToolset.h"
 #include "LandscapeExtensionToolset.h"
 #include "LandscapeGrassExtensionToolset.h"
 #include "PCGExtensionToolset.h"
@@ -71,6 +72,33 @@ bool FUnrealToolsetsExtensionContractTest::RunTest(const FString& Parameters)
 	TestNotNull(
 		TEXT("LandscapeGrassExtensionToolset class is reflected"),
 		LandscapeGrassClass);
+	const UClass* FabClass = UFabExtensionToolset::StaticClass();
+	TestNotNull(TEXT("FabExtensionToolset class is reflected"), FabClass);
+	const TArray<FName> FabFunctions = {
+		TEXT("GetFabIntegrationInfo"),
+		TEXT("GetFabCacheSummary"),
+		TEXT("ListFabCachedEntries"),
+		TEXT("GetFabCacheEntryStatus"),
+		TEXT("GetFabImportTypeSupport")
+	};
+	for (const FName FunctionName : FabFunctions)
+	{
+		const UFunction* Function = FabClass != nullptr
+			? FabClass->FindFunctionByName(FunctionName)
+			: nullptr;
+		TestNotNull(
+			*FString::Printf(TEXT("%s is reflected"), *FunctionName.ToString()),
+			Function);
+		if (Function != nullptr)
+		{
+			TestTrue(
+				*FString::Printf(TEXT("%s is static"), *FunctionName.ToString()),
+				Function->HasAnyFunctionFlags(FUNC_Static));
+			TestTrue(
+				*FString::Printf(TEXT("%s is AICallable"), *FunctionName.ToString()),
+				Function->HasMetaData(TEXT("AICallable")));
+		}
+	}
 	const TArray<FName> PCGFunctions = {
 		TEXT("GetWeightedMeshEntries"),
 		TEXT("ReplaceWeightedMeshEntries"),
