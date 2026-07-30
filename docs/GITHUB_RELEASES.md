@@ -38,9 +38,9 @@ documentation sections.
 - Git tag: `unreal-toolsets-v0.2.0`
 - Release title: `Unreal Toolsets Extension 0.2.0`
 - Binary asset:
-  `UnrealToolsetsExtension-0.2.0-UE5.8-Win64.zip`
+  `UnrealToolsetsExtension-0.2.0-UE5.8.1-Win64.zip`
 - Checksum:
-  `UnrealToolsetsExtension-0.2.0-UE5.8-Win64.zip.sha256`
+  `UnrealToolsetsExtension-0.2.0-UE5.8.1-Win64.zip.sha256`
 
 Use a new plugin version when reflected schemas or runtime behavior change.
 Rebuilding the same source for another Engine or platform may add a distinctly
@@ -59,7 +59,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -EngineRoot "C:\Program Files\Epic Games\UE_5.8" `
   -OutputDirectory "C:\release\unreal-toolsets-v0.2.0" `
   -SourceCommit $commit `
-  -EngineVersionLabel "UE5.8" `
+  -EngineVersionLabel "UE5.8.1" `
   -TargetPlatforms "Win64"
 ```
 

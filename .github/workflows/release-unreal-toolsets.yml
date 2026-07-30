@@ -65,7 +65,7 @@ jobs:
             -EngineRoot $env:ENGINE_ROOT `
             -OutputDirectory $output `
             -SourceCommit $env:GITHUB_SHA `
-            -EngineVersionLabel "UE5.8" `
+            -EngineVersionLabel "UE5.8.1" `
             -TargetPlatforms "Win64"
           "RELEASE_ASSET_DIRECTORY=$output" | Out-File `
             -FilePath $env:GITHUB_ENV `

@@ -36,3 +36,11 @@ or submitted automatically.
 
 Other Engine versions and platforms remain unverified until a separately
 named release asset passes the complete validation matrix.
+
+## Validation
+
+- repository contract and distribution tests: 14 passed
+- UE 5.8.1 Win64 `BuildPlugin`: passed
+- packaged-plugin automation group: 9 passed, 0 failed
+- all six extension Toolsets registered from the packaged DLL
+- ZIP layout, commit-bound manifest, and SHA-256 checksum: verified
