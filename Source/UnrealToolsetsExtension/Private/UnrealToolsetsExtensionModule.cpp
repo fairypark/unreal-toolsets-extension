@@ -4,6 +4,7 @@
 #include "LandscapeExtensionToolset.h"
 #include "LandscapeGrassExtensionToolset.h"
 #include "FabExtensionToolset.h"
+#include "ObservabilityExtensionToolset.h"
 #include "PCGExtensionToolset.h"
 #include "PlacementExtensionToolset.h"
 
@@ -17,10 +18,12 @@ public:
 		UToolsetRegistry::RegisterToolsetClass(UFabExtensionToolset::StaticClass());
 		UToolsetRegistry::RegisterToolsetClass(UPlacementExtensionToolset::StaticClass());
 		UToolsetRegistry::RegisterToolsetClass(UPCGExtensionToolset::StaticClass());
+		UToolsetRegistry::RegisterToolsetClass(UObservabilityExtensionToolset::StaticClass());
 	}
 
 	virtual void ShutdownModule() override
 	{
+		UToolsetRegistry::UnregisterToolsetClass(UObservabilityExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(UPCGExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(UPlacementExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(UFabExtensionToolset::StaticClass());

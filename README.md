@@ -61,9 +61,17 @@ public C++ interfaces:
 - `GetFabCacheEntryStatus`
 - `GetFabImportTypeSupport`
 
+`ObservabilityExtensionToolset` exposes client-neutral, read-only metadata:
+
+- `GetExtensionObservabilityInfo`
+
+It returns the extension and Engine versions plus a versioned catalog of exact
+operation classes, postcondition and persistence semantics, and allowlisted
+stable error codes. It does not enable collection or store usage data.
+
 ## Requirements
 
-- Unreal Engine 5.8 for version `0.1.0`
+- Unreal Engine 5.8 for version `0.2.0`
 - the experimental `ToolsetRegistry` plugin
 - the built-in `PCG` plugin
 - the built-in `Fab` plugin
@@ -117,7 +125,8 @@ different Engine version.
 
 5. Confirm `list_toolsets` contains `LandscapeExtensionToolset`,
    `LandscapeGrassExtensionToolset`, `PlacementExtensionToolset`,
-   `PCGExtensionToolset`, and `FabExtensionToolset`.
+   `PCGExtensionToolset`, `FabExtensionToolset`, and
+   `ObservabilityExtensionToolset`.
 
 ## Safety and current limits
 
@@ -125,7 +134,7 @@ different Engine version.
 - Heightmap and weightmap imports require an exact full-Landscape resolution.
 - Mutations refuse regions with unloaded World Partition components.
 - `CreateLandscape` currently refuses World Partition worlds because version
-  `0.1.0` does not create streaming proxies.
+  `0.2.0` does not create streaming proxies.
 - Reimport validates the recorded source, saves a recovery point, captures the
   original height data, verifies the complete write plus representative points,
   and rolls back on failure.
@@ -171,6 +180,7 @@ The GitHub repository and release process are specified in
 - Contribution rules: `CONTRIBUTING.md`
 - Security policy: `SECURITY.md`
 - Extension design contract: `docs/TOOLSETS_EXTENSION_GUIDELINES.md`
+- Usefulness-information design: `docs/USEFULNESS_INFORMATION.md`
 - Capability roadmap, including the guarded Fab scope: `docs/ROADMAP.md`
 
 Use GitHub Issues for reproducible feature requests and non-sensitive bugs.

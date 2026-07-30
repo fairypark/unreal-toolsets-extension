@@ -22,6 +22,7 @@ public class UnrealToolsetsExtension : ModuleRules
 			{
 				"Foliage",
 				"Fab",
+				"Json",
 				"LandscapeEditor",
 				"Projects",
 				"UnrealEd"

@@ -34,13 +34,13 @@ documentation sections.
 
 ## Version and tag policy
 
-- Plugin semantic version: `0.1.0`
-- Git tag: `unreal-toolsets-v0.1.0`
-- Release title: `Unreal Toolsets Extension 0.1.0`
+- Plugin semantic version: `0.2.0`
+- Git tag: `unreal-toolsets-v0.2.0`
+- Release title: `Unreal Toolsets Extension 0.2.0`
 - Binary asset:
-  `UnrealToolsetsExtension-0.1.0-UE5.8-Win64.zip`
+  `UnrealToolsetsExtension-0.2.0-UE5.8-Win64.zip`
 - Checksum:
-  `UnrealToolsetsExtension-0.1.0-UE5.8-Win64.zip.sha256`
+  `UnrealToolsetsExtension-0.2.0-UE5.8-Win64.zip.sha256`
 
 Use a new plugin version when reflected schemas or runtime behavior change.
 Rebuilding the same source for another Engine or platform may add a distinctly
@@ -57,7 +57,7 @@ $commit = git rev-parse HEAD
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\build-unreal-extension-github-release.ps1 `
   -EngineRoot "C:\Program Files\Epic Games\UE_5.8" `
-  -OutputDirectory "C:\release\unreal-toolsets-v0.1.0" `
+  -OutputDirectory "C:\release\unreal-toolsets-v0.2.0" `
   -SourceCommit $commit `
   -EngineVersionLabel "UE5.8" `
   -TargetPlatforms "Win64"
@@ -79,8 +79,9 @@ Before publishing:
 5. Run the complete `AI.UnrealToolsetsExtension` automation group.
 6. Confirm the packaged plugin registers `LandscapeExtensionToolset`,
    `LandscapeGrassExtensionToolset`, `PlacementExtensionToolset`, and
-   `PCGExtensionToolset`, and `FabExtensionToolset`.
-7. Discover all five toolsets through a live Unreal MCP server.
+   `PCGExtensionToolset`, `FabExtensionToolset`, and
+   `ObservabilityExtensionToolset`.
+7. Discover all six toolsets through a live Unreal MCP server.
 8. Exercise Landscape inspection and mutations on disposable test data,
    including invalid source, invalid resolution, rollback, save failure, and
    World Partition refusal cases.
@@ -94,9 +95,11 @@ Before publishing:
     cache ids, and registered/unregistered import-type queries. Confirm that
     responses expose no cookies, tokens, authentication state, entitlements,
     marketplace responses, or download controls.
-13. Compare the ZIP hash with its `.sha256` file.
-14. Confirm the ZIP contains no `Intermediate`, `Saved`, private paths, project
-   assets, or official Epic plugin files.
+13. Exercise the observability information query and confirm its version,
+    operation catalog, safe-error catalog, and client-neutral privacy boundary.
+14. Compare the ZIP hash with its `.sha256` file.
+15. Confirm the ZIP contains no `Intermediate`, `Saved`, private paths, project
+    assets, or official Epic plugin files.
 
 Do not advertise an Engine or platform as supported until all applicable gates
 pass for that combination.
@@ -107,13 +110,13 @@ Create the release only after GitHub authentication and repository ownership
 have been confirmed:
 
 ```powershell
-gh release create unreal-toolsets-v0.1.0 `
+gh release create unreal-toolsets-v0.2.0 `
   --repo <owner>/unreal-toolsets-extension `
-  --title "Unreal Toolsets Extension 0.1.0" `
-  --notes-file .\docs\releases\unreal-toolsets-v0.1.0.md `
-  C:\release\unreal-toolsets-v0.1.0\*.zip `
-  C:\release\unreal-toolsets-v0.1.0\*.sha256 `
-  C:\release\unreal-toolsets-v0.1.0\release-manifest.json
+  --title "Unreal Toolsets Extension 0.2.0" `
+  --notes-file .\docs\releases\unreal-toolsets-v0.2.0.md `
+  C:\release\unreal-toolsets-v0.2.0\*.zip `
+  C:\release\unreal-toolsets-v0.2.0\*.sha256 `
+  C:\release\unreal-toolsets-v0.2.0\release-manifest.json
 ```
 
 For a first public release, create it as a draft, inspect the rendered notes and

@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -60,6 +61,74 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         )
         self.assertIn(
             "UnregisterToolsetClass(UFabExtensionToolset::StaticClass())", module
+        )
+        self.assertIn(
+            "RegisterToolsetClass(UObservabilityExtensionToolset::StaticClass())",
+            module,
+        )
+        self.assertIn(
+            "UnregisterToolsetClass(UObservabilityExtensionToolset::StaticClass())",
+            module,
+        )
+
+    def test_observability_catalog_matches_public_tools_and_safe_errors(self):
+        catalog = json.loads(
+            (PLUGIN_ROOT / "Resources" / "UsefulnessCatalog.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(1, catalog["contract_version"])
+
+        public_headers = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (
+                PLUGIN_ROOT / "Source" / "UnrealToolsetsExtension" / "Public"
+            ).glob("*ExtensionToolset.h")
+        )
+        reflected_operations = set(
+            re.findall(
+                r"UFUNCTION\(meta = \(AICallable\).*?\)\s+"
+                r"static\s+[\w:<>,*&\s]+\s+(\w+)\s*\(",
+                public_headers,
+                re.DOTALL,
+            )
+        )
+        catalog_operations = {
+            item["operation"] for item in catalog["operations"]
+        }
+        self.assertEqual(reflected_operations, catalog_operations)
+        self.assertEqual(34, len(catalog["operations"]))
+        self.assertEqual(
+            len(catalog["operations"]),
+            len(
+                {
+                    (item["toolset"], item["operation"])
+                    for item in catalog["operations"]
+                }
+            ),
+        )
+
+        private_sources = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (
+                PLUGIN_ROOT / "Source" / "UnrealToolsetsExtension" / "Private"
+            ).glob("*ExtensionToolset.cpp")
+        )
+        raised_codes = set(
+            re.findall(
+                r'RaiseError\s*\(\s*TEXT\("([A-Z0-9_]+)"\)',
+                private_sources,
+            )
+        )
+        catalog_errors = {item["code"] for item in catalog["errors"]}
+        self.assertEqual(raised_codes, catalog_errors)
+        self.assertEqual(55, len(catalog_errors))
+        self.assertTrue(
+            all(
+                set(item)
+                == {"code", "category", "verified_rollback"}
+                for item in catalog["errors"]
+            )
         )
 
     def test_public_contract_contains_typed_p0_tools(self):
@@ -297,7 +366,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         )
         for required in (
             "unreal-toolsets-extension",
-            "unreal-toolsets-v0.1.0",
+            "unreal-toolsets-v0.2.0",
             "Claude, Codex, and other MCP users",
             "protected tags",
             "Never run untrusted pull-request code",

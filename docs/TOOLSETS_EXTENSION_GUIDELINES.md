@@ -77,6 +77,22 @@ Do not infer compatibility with a new Engine version from descriptor loading alo
 - Use semantic versions and release notes that distinguish added APIs, behavior changes, deprecations, and verified Engine versions.
 - Preserve the repository license and any third-party notices in source and packaged distributions.
 
+## 9. Keep usefulness observation client neutral
+
+- Follow `USEFULNESS_INFORMATION.md` before adding metrics, analytics, ratings,
+  consent, or usage-summary behavior.
+- Keep consent, event storage, retention, and summaries in an MCP-client
+  adapter; do not duplicate them in this Editor plugin.
+- Publish only deterministic, non-sensitive observability metadata: exact
+  operation identity, operation class, success semantics, and allowlisted
+  stable error codes.
+- Never inspect or persist prompts, requests, responses, paths, project state,
+  Actor or Asset names, credentials, or raw identifiers for usefulness
+  analysis.
+- Do not infer task boundaries, retries, verification, or failures when the
+  required lifecycle signal is unavailable.
+- Never upload usefulness information or submit it to an issue automatically.
+
 ## Review checklist
 
 - Does an official tool now cover this capability?
@@ -87,3 +103,5 @@ Do not infer compatibility with a new Engine version from descriptor loading alo
 - Are all functions static, typed, registered, documented, and tested?
 - Can the plugin build without modifying the Engine?
 - Can another user install it by copying one packaged plugin folder?
+- Does any usefulness observation preserve the client-neutral consent and
+  privacy boundary?
