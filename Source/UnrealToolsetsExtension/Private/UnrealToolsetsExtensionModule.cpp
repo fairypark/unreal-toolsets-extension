@@ -7,6 +7,7 @@
 #include "ObservabilityExtensionToolset.h"
 #include "PCGExtensionToolset.h"
 #include "PlacementExtensionToolset.h"
+#include "VisualEvidenceExtensionToolset.h"
 
 class FUnrealToolsetsExtensionModule final : public IModuleInterface
 {
@@ -19,10 +20,12 @@ public:
 		UToolsetRegistry::RegisterToolsetClass(UPlacementExtensionToolset::StaticClass());
 		UToolsetRegistry::RegisterToolsetClass(UPCGExtensionToolset::StaticClass());
 		UToolsetRegistry::RegisterToolsetClass(UObservabilityExtensionToolset::StaticClass());
+		UToolsetRegistry::RegisterToolsetClass(UVisualEvidenceExtensionToolset::StaticClass());
 	}
 
 	virtual void ShutdownModule() override
 	{
+		UToolsetRegistry::UnregisterToolsetClass(UVisualEvidenceExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(UObservabilityExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(UPCGExtensionToolset::StaticClass());
 		UToolsetRegistry::UnregisterToolsetClass(UPlacementExtensionToolset::StaticClass());

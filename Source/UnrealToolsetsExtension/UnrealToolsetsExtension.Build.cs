@@ -24,9 +24,13 @@ public class UnrealToolsetsExtension : ModuleRules
 				"Fab",
 				"Json",
 				"LandscapeEditor",
+				"LevelEditor",
 				"Projects",
+				"RenderCore",
 				"TypedElementFramework",
 				"UnrealEd"
 			});
+
+		AddEngineThirdPartyPrivateStaticDependencies(Target, "OpenSSL");
 	}
 }

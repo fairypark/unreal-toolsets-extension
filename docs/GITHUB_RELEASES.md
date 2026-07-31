@@ -34,13 +34,13 @@ documentation sections.
 
 ## Version and tag policy
 
-- Plugin semantic version: `0.3.0`
-- Git tag: `unreal-toolsets-v0.3.0`
-- Release title: `Unreal Toolsets Extension 0.3.0`
+- Plugin semantic version: `0.4.0`
+- Git tag: `unreal-toolsets-v0.4.0`
+- Release title: `Unreal Toolsets Extension 0.4.0`
 - Binary asset:
-  `UnrealToolsetsExtension-0.3.0-UE5.8.1-Win64.zip`
+  `UnrealToolsetsExtension-0.4.0-UE5.8.1-Win64.zip`
 - Checksum:
-  `UnrealToolsetsExtension-0.3.0-UE5.8.1-Win64.zip.sha256`
+  `UnrealToolsetsExtension-0.4.0-UE5.8.1-Win64.zip.sha256`
 
 Use a new plugin version when reflected schemas or runtime behavior change.
 Rebuilding the same source for another Engine or platform may add a distinctly
@@ -57,7 +57,7 @@ $commit = git rev-parse HEAD
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\build-unreal-extension-github-release.ps1 `
   -EngineRoot "C:\Program Files\Epic Games\UE_5.8" `
-  -OutputDirectory "C:\release\unreal-toolsets-v0.3.0" `
+  -OutputDirectory "C:\release\unreal-toolsets-v0.4.0" `
   -SourceCommit $commit `
   -EngineVersionLabel "UE5.8.1" `
   -TargetPlatforms "Win64"
@@ -110,13 +110,13 @@ Create the release only after GitHub authentication and repository ownership
 have been confirmed:
 
 ```powershell
-gh release create unreal-toolsets-v0.3.0 `
+gh release create unreal-toolsets-v0.4.0 `
   --repo <owner>/unreal-toolsets-extension `
-  --title "Unreal Toolsets Extension 0.3.0" `
-  --notes-file .\docs\releases\unreal-toolsets-v0.3.0.md `
-  C:\release\unreal-toolsets-v0.3.0\*.zip `
-  C:\release\unreal-toolsets-v0.3.0\*.sha256 `
-  C:\release\unreal-toolsets-v0.3.0\release-manifest.json
+  --title "Unreal Toolsets Extension 0.4.0" `
+  --notes-file .\docs\releases\unreal-toolsets-v0.4.0.md `
+  C:\release\unreal-toolsets-v0.4.0\*.zip `
+  C:\release\unreal-toolsets-v0.4.0\*.sha256 `
+  C:\release\unreal-toolsets-v0.4.0\release-manifest.json
 ```
 
 For a first public release, create it as a draft, inspect the rendered notes and

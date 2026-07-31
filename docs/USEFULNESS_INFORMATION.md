@@ -143,7 +143,8 @@ The extension identity allowlist is:
 - `LandscapeGrassExtensionToolset`;
 - `PlacementExtensionToolset`;
 - `PCGExtensionToolset`;
-- `FabExtensionToolset`.
+- `FabExtensionToolset`;
+- `VisualEvidenceExtensionToolset`.
 
 Adding a Toolset requires updating the catalog and its contract test in the same
 change.
@@ -168,6 +169,8 @@ Contract version 1 encodes the current API explicitly:
 | `LandscapeGrassExtensionToolset` | mutation | `ReplaceGrassVarieties`, `AddGrassVariety`, `UpdateGrassVariety`, `RemoveGrassVariety`, `ReorderGrassVariety`, `SetGrassDensityScaling` |
 | `FabExtensionToolset` | read | `GetFabIntegrationInfo`, `GetFabCacheSummary`, `ListFabCachedEntries`, `GetFabCacheEntryStatus`, `GetFabImportTypeSupport`, `GetFabOwnedLibrarySearchCapability`, `GetFabOwnedLibrarySnapshotInfo`, `SearchFabOwnedAssets` |
 | `FabExtensionToolset` | ephemeral mutation | `RequestFabOwnedLibrarySync` |
+| `VisualEvidenceExtensionToolset` | save | `CaptureCameraToPng` |
+| `VisualEvidenceExtensionToolset` | validation | `VerifyEvidenceForSupervision` |
 
 The packaged catalog uses one entry per operation; this table groups them only
 for readability. PCG and Landscape Grass mutations verify in-memory state and

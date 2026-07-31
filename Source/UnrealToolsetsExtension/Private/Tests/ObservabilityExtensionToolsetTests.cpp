@@ -8,6 +8,7 @@
 #include "Misc/AutomationTest.h"
 #include "PCGExtensionToolset.h"
 #include "PlacementExtensionToolset.h"
+#include "VisualEvidenceExtensionToolset.h"
 #include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -30,7 +31,8 @@ bool FObservabilityExtensionCatalogTest::RunTest(const FString& Parameters)
 		UPlacementExtensionToolset::StaticClass(),
 		UPCGExtensionToolset::StaticClass(),
 		ULandscapeGrassExtensionToolset::StaticClass(),
-		UFabExtensionToolset::StaticClass()
+		UFabExtensionToolset::StaticClass(),
+		UVisualEvidenceExtensionToolset::StaticClass()
 	};
 
 	TSet<FString> ReflectedOperations;
@@ -64,7 +66,7 @@ bool FObservabilityExtensionCatalogTest::RunTest(const FString& Parameters)
 		TestTrue(*FString::Printf(TEXT("Catalog operation is unique: %s"), *Key), !CatalogOperations.Contains(Key));
 		CatalogOperations.Add(Key);
 	}
-	TestEqual(TEXT("Catalog operation count"), CatalogOperations.Num(), 38);
+	TestEqual(TEXT("Catalog operation count"), CatalogOperations.Num(), 40);
 	bool bCatalogMatchesReflection =
 		CatalogOperations.Num() == ReflectedOperations.Num();
 	for (const FString& ReflectedOperation : ReflectedOperations)
@@ -85,7 +87,7 @@ bool FObservabilityExtensionCatalogTest::RunTest(const FString& Parameters)
 			!ErrorCodes.Contains(Descriptor.ErrorCode));
 		ErrorCodes.Add(Descriptor.ErrorCode);
 	}
-	TestEqual(TEXT("Catalog error-code count"), ErrorCodes.Num(), 59);
+	TestEqual(TEXT("Catalog error-code count"), ErrorCodes.Num(), 69);
 	TestTrue(
 		TEXT("Verified rollback code is cataloged"),
 		ErrorCodes.Contains(TEXT("LANDSCAPE_EXTENSION_BATCH_VERIFY_FAILED_ROLLED_BACK")));
