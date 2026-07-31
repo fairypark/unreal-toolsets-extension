@@ -166,7 +166,8 @@ Contract version 1 encodes the current API explicitly:
 | `PCGExtensionToolset` | mutation | `ReplaceWeightedMeshEntries`, `AddWeightedMeshEntry`, `UpdateWeightedMeshEntry`, `RemoveWeightedMeshEntry`, `ReorderWeightedMeshEntry` |
 | `LandscapeGrassExtensionToolset` | read | `GetGrassVarieties` |
 | `LandscapeGrassExtensionToolset` | mutation | `ReplaceGrassVarieties`, `AddGrassVariety`, `UpdateGrassVariety`, `RemoveGrassVariety`, `ReorderGrassVariety`, `SetGrassDensityScaling` |
-| `FabExtensionToolset` | read | `GetFabIntegrationInfo`, `GetFabCacheSummary`, `ListFabCachedEntries`, `GetFabCacheEntryStatus`, `GetFabImportTypeSupport` |
+| `FabExtensionToolset` | read | `GetFabIntegrationInfo`, `GetFabCacheSummary`, `ListFabCachedEntries`, `GetFabCacheEntryStatus`, `GetFabImportTypeSupport`, `GetFabOwnedLibrarySearchCapability`, `GetFabOwnedLibrarySnapshotInfo`, `SearchFabOwnedAssets` |
+| `FabExtensionToolset` | ephemeral mutation | `RequestFabOwnedLibrarySync` |
 
 The packaged catalog uses one entry per operation; this table groups them only
 for readability. PCG and Landscape Grass mutations verify in-memory state and
