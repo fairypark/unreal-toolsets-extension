@@ -24,6 +24,14 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         self.assertIn("/.codex/config.toml", gitignore)
         for tool_name in ("list_toolsets", "describe_toolset", "call_tool"):
             self.assertIn(tool_name, probe)
+        for required in (
+            "ToolsetName",
+            "RequiredOperationNames",
+            "NormalizedRequiredOperationNames",
+            "DescribedToolset",
+            "Required operations are missing",
+        ):
+            self.assertIn(required, probe)
         self.assertIn("Mcp-Session-Id", probe)
         self.assertNotRegex(
             probe,
@@ -35,6 +43,8 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             (PLUGIN_ROOT / "UnrealToolsetsExtension.uplugin").read_text(encoding="utf-8")
         )
         self.assertTrue(descriptor["EditorOnly"])
+        self.assertEqual(4, descriptor["Version"])
+        self.assertEqual("0.4.0", descriptor["VersionName"])
         self.assertEqual("UnrealToolsetsExtension", descriptor["Modules"][0]["Name"])
         dependencies = {item["Name"] for item in descriptor["Plugins"]}
         self.assertIn("ToolsetRegistry", dependencies)
@@ -91,6 +101,15 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "UnregisterToolsetClass(UObservabilityExtensionToolset::StaticClass())",
             module,
         )
+        self.assertIn(
+            "RegisterToolsetClass(UVisualEvidenceExtensionToolset::StaticClass())",
+            module,
+        )
+        self.assertIn(
+            "UnregisterToolsetClass(UVisualEvidenceExtensionToolset::StaticClass())",
+            module,
+        )
+
     def test_observability_catalog_matches_public_tools_and_safe_errors(self):
         catalog = json.loads(
             (PLUGIN_ROOT / "Resources" / "UsefulnessCatalog.json").read_text(
@@ -117,7 +136,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             item["operation"] for item in catalog["operations"]
         }
         self.assertEqual(reflected_operations, catalog_operations)
-        self.assertEqual(38, len(catalog["operations"]))
+        self.assertEqual(40, len(catalog["operations"]))
         self.assertEqual(
             len(catalog["operations"]),
             len(
@@ -140,9 +159,15 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
                 private_sources,
             )
         )
+        raised_codes.update(
+            re.findall(
+                r'OutErrorCode\s*=\s*TEXT\("([A-Z0-9_]+)"\)',
+                private_sources,
+            )
+        )
         catalog_errors = {item["code"] for item in catalog["errors"]}
         self.assertEqual(raised_codes, catalog_errors)
-        self.assertEqual(59, len(catalog_errors))
+        self.assertEqual(69, len(catalog_errors))
         self.assertTrue(
             all(
                 set(item)
@@ -216,6 +241,67 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         self.assertIn("QueryParams.AddIgnoredActor(Actor)", implementation)
         self.assertIn("PLACEMENT_EXTENSION_NO_GROUND_HIT", implementation)
         self.assertNotIn("8000.0", implementation)
+
+    def test_visual_evidence_capture_is_camera_bound_and_project_saved_only(self):
+        header = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Public"
+            / "VisualEvidenceExtensionToolset.h"
+        ).read_text(encoding="utf-8")
+        implementation = (
+            PLUGIN_ROOT
+            / "Source"
+            / "UnrealToolsetsExtension"
+            / "Private"
+            / "VisualEvidenceExtensionToolset.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn("CaptureCameraToPng(", header)
+        self.assertIn("VerifyEvidenceForSupervision(", header)
+        self.assertEqual(2, header.count("meta = (AICallable)"))
+        for required in (
+            "ACameraActor* CameraActor",
+            "ACameraActor* ExpectedCameraActor",
+            "CameraRole",
+            "ExpectedCameraRole",
+            "ExpectedEvidenceSha256",
+            "ExpectedReceiptSha256",
+            "OutputRelativePath",
+            "EvidenceRelativePath",
+            "WarmupDrawCount",
+            "StableFramePairCount",
+            "EvidenceAbsolutePath",
+            "ReceiptAbsolutePath",
+            "WidthPixels",
+            "HeightPixels",
+            "AppliedMinimumWidthPixels",
+            "AppliedMinimumHeightPixels",
+            "MaximumMeanPixelDelta",
+            "EvidenceSha256",
+            "ReceiptSha256",
+            "CameraViewStateSha256",
+            "CameraFieldOfViewDegrees",
+            "bCameraViewApplied",
+            "EvidenceFileModifiedAtUtc",
+        ):
+            self.assertIn(required, header)
+        for required in (
+            "FPaths::ProjectSavedDir()",
+            "FPaths::IsUnderDirectory",
+            "GetViewportScreenShot",
+            "PNGCompressImageArray",
+            "openssl/sha.h",
+            "SHA256(",
+            "VISUAL_EVIDENCE_OUTPUT_EXISTS",
+            "VISUAL_EVIDENCE_VERIFY_FAILED",
+            "VISUAL_EVIDENCE_CAMERA_MISMATCH",
+            "VISUAL_EVIDENCE_DIMENSIONS_TOO_SMALL",
+            "VISUAL_EVIDENCE_RENDER_STATE_UNSETTLED",
+            "evidence.json",
+        ):
+            self.assertIn(required, implementation)
+        self.assertNotIn("FPaths::ProjectContentDir()", implementation)
 
     def test_pcg_extension_has_structured_weighted_mesh_crud_and_audit(self):
         header = (
@@ -398,7 +484,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         )
         for required in (
             "unreal-toolsets-extension",
-            "unreal-toolsets-v0.3.0",
+            "unreal-toolsets-v0.4.0",
             "Claude, Codex, and other MCP users",
             "protected tags",
             "Never run untrusted pull-request code",

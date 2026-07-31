@@ -1,10 +1,23 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^http://(127\.0\.0\.1|localhost):[0-9]+/[A-Za-z0-9._~!$&''()*+,;=:@%/-]+$')]
-    [string] $Endpoint = 'http://127.0.0.1:8000/mcp'
+    [string] $Endpoint = 'http://127.0.0.1:8000/mcp',
+
+    [ValidatePattern('^[A-Za-z0-9_.]+$')]
+    [string] $ToolsetName = '',
+
+    [ValidateNotNull()]
+    [string[]] $RequiredOperationNames = @()
 )
 
 $ErrorActionPreference = 'Stop'
+
+$NormalizedRequiredOperationNames = @(
+    $RequiredOperationNames |
+        ForEach-Object { $_ -split ',' } |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ }
+)
 
 Add-Type -AssemblyName System.Net.Http
 
@@ -64,7 +77,12 @@ function Send-McpRequest {
         'application/json'
     )
 
-    $Response = $Client.SendAsync($Request).GetAwaiter().GetResult()
+    try {
+        $Response = $Client.SendAsync($Request).GetAwaiter().GetResult()
+    }
+    catch {
+        throw "$Operation could not reach the MCP endpoint."
+    }
     if (-not $Response.IsSuccessStatusCode) {
         $StatusCode = [int] $Response.StatusCode
         $Response.Dispose()
@@ -123,6 +141,31 @@ function Invoke-McpTool {
     }
 
     return $Payload
+}
+
+function ConvertFrom-McpToolText {
+    param(
+        [Parameter(Mandatory)]
+        $Payload,
+
+        [Parameter(Mandatory)]
+        [string] $Operation
+    )
+
+    $TextContent = @(
+        $Payload.result.content |
+            Where-Object { $_.type -eq 'text' } |
+            Select-Object -First 1
+    )
+    if ($TextContent.Count -ne 1 -or -not $TextContent[0].text) {
+        throw "$Operation returned no text result."
+    }
+    try {
+        return $TextContent[0].text | ConvertFrom-Json
+    }
+    catch {
+        throw "$Operation returned text that is not JSON."
+    }
 }
 
 $Client = [System.Net.Http.HttpClient]::new()
@@ -197,8 +240,8 @@ try {
     }
 
     $ToolNames = @($ToolsListPayload.result.tools | ForEach-Object { $_.name })
-    $RequiredToolNames = @('list_toolsets', 'describe_toolset', 'call_tool')
-    $MissingToolNames = @($RequiredToolNames | Where-Object { $_ -notin $ToolNames })
+    $RequiredMetaToolNames = @('list_toolsets', 'describe_toolset', 'call_tool')
+    $MissingToolNames = @($RequiredMetaToolNames | Where-Object { $_ -notin $ToolNames })
     if ($MissingToolNames.Count -gt 0) {
         throw "MCP tool-search meta-tools are missing: $($MissingToolNames -join ', ')."
     }
@@ -209,14 +252,42 @@ try {
         -RequestId 3 `
         -ToolName 'list_toolsets' `
         -Arguments @{})
-    [void] (Invoke-McpTool `
+    $DescribedToolsetName = if ($ToolsetName) {
+        $ToolsetName
+    }
+    else {
+        'ToolsetRegistry.AgentSkillToolset'
+    }
+    $DescribePayload = Invoke-McpTool `
         -Client $Client `
         -SessionId $SessionId `
         -RequestId 4 `
         -ToolName 'describe_toolset' `
         -Arguments @{
-            toolset_name = 'ToolsetRegistry.AgentSkillToolset'
-        })
+            toolset_name = $DescribedToolsetName
+        }
+    $Description = ConvertFrom-McpToolText `
+        -Payload $DescribePayload `
+        -Operation 'describe_toolset'
+    if ($ToolsetName) {
+        $DescribedOperationNames = @(
+            $Description.tools | ForEach-Object {
+                if ($_.name) { $_.name } elseif ($_.tool_name) { $_.tool_name }
+            }
+        )
+        $MissingOperationNames = @(
+            $NormalizedRequiredOperationNames |
+                Where-Object {
+                    $RequiredName = $_
+                    -not ($DescribedOperationNames | Where-Object {
+                        $_ -eq $RequiredName -or $_.EndsWith(".$RequiredName")
+                    })
+                }
+        )
+        if ($MissingOperationNames.Count -gt 0) {
+            throw "Required operations are missing from ${ToolsetName}: $($MissingOperationNames -join ', ')."
+        }
+    }
     [void] (Invoke-McpTool `
         -Client $Client `
         -SessionId $SessionId `
@@ -231,8 +302,10 @@ try {
         Endpoint = $Endpoint
         ServerName = $InitializePayload.result.serverInfo.name
         ServerVersion = $InitializePayload.result.serverInfo.version
-        ToolSearchMetaTools = $RequiredToolNames
-        VerifiedOperations = $RequiredToolNames
+        ToolSearchMetaTools = $RequiredMetaToolNames
+        DescribedToolset = $DescribedToolsetName
+        RequiredOperations = $NormalizedRequiredOperationNames
+        VerifiedOperations = $RequiredMetaToolNames
     }
 }
 finally {

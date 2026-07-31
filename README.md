@@ -91,9 +91,38 @@ It returns the extension and Engine versions plus a versioned catalog of exact
 operation classes, postcondition and persistence semantics, and allowlisted
 stable error codes. It does not enable collection or store usage data.
 
+`VisualEvidenceExtensionToolset` provides persistent fixed-camera review
+evidence:
+
+- `CaptureCameraToPng`
+- `VerifyEvidenceForSupervision`
+
+The operation requires a loaded `CameraActor` from the current Editor world,
+requires a stable camera role and minimum dimensions, waits for compilation and
+streaming to settle, enforces an invariant 1280x720 floor and a maximum 0.5
+mean RGB pixel-delta threshold, proves two consecutive stable frame pairs,
+removes editor overlays, restores the previous viewport state, and writes only
+beneath the current project's `Saved` directory. Every unique PNG is paired with a
+`.evidence.json` receipt binding its SHA-256, dimensions, camera and world
+identity, applied camera-component view and post process, complete
+`FMinimalViewInfo` digest, applied dimension and stability thresholds,
+timestamps, UI-clean state, and settlement data.
+`VerifyEvidenceForSupervision` re-reads that pair immediately before handoff and
+requires the capture-returned PNG and receipt SHA-256 values as trust anchors.
+It fails closed if the files, role, persistent camera, complete camera/view
+state, minimum dimensions, timestamps, or render-settlement contract no longer
+match.
+
+It was added because ordinary screenshots do not prove that a review image
+came from the intended persistent camera, current world and camera state, a
+settled renderer, or unchanged bytes at supervisor handoff. The Toolset fills
+that provenance and integrity gap; it deliberately does not judge composition
+or visual quality. See `docs/VISUAL_EVIDENCE_TOOLSET.md` for the addition
+rationale, workflow, guarantees, and limits.
+
 ## Requirements
 
-- Unreal Engine 5.8.1 for version `0.3.0`
+- Unreal Engine 5.8.1 for version `0.4.0`
 - the experimental `ToolsetRegistry` plugin
 - the built-in `PCG` plugin
 - the built-in `Fab` plugin
@@ -131,12 +160,15 @@ The connection can be verified without driving the Editor UI:
 
 ```powershell
 .\scripts\Test-UnrealMcpConnection.ps1 `
-  -Endpoint http://localhost:8000/mcp
+  -Endpoint http://localhost:8000/mcp `
+  -ToolsetName UnrealToolsetsExtension.VisualEvidenceExtensionToolset `
+  -RequiredOperationNames CaptureCameraToPng,VerifyEvidenceForSupervision
 ```
 
 The test initializes an MCP session and fails unless `tools/list` returns all
-three tool-search meta-tools. It never reads or prints credentials, cookies, or
-session identifiers.
+three tool-search meta-tools. When a Toolset is supplied, it also fails unless
+`describe_toolset` exposes every required operation. It never reads or prints
+credentials, cookies, or session identifiers.
 
 ## Build a distributable package
 
@@ -178,8 +210,9 @@ different Engine version.
 
 5. Confirm `list_toolsets` contains `LandscapeExtensionToolset`,
    `LandscapeGrassExtensionToolset`, `PlacementExtensionToolset`,
-   `PCGExtensionToolset`, `FabExtensionToolset`, and
-   `ObservabilityExtensionToolset`.
+   `PCGExtensionToolset`, `FabExtensionToolset`,
+   `ObservabilityExtensionToolset`, and
+   `VisualEvidenceExtensionToolset`.
 
 ## Safety and current limits
 
@@ -187,7 +220,7 @@ different Engine version.
 - Heightmap and weightmap imports require an exact full-Landscape resolution.
 - Mutations refuse regions with unloaded World Partition components.
 - `CreateLandscape` currently refuses World Partition worlds because version
-  `0.3.0` does not create streaming proxies.
+  `0.4.0` does not create streaming proxies.
 - Reimport validates the recorded source, saves a recovery point, captures the
   original height data, verifies the complete write plus representative points,
   and rolls back on failure.
@@ -222,6 +255,11 @@ different Engine version.
   deletion. After a user starts a download in the Fab window, it can inspect
   and time-filter completed top-level ZIP cache entries.
 - No tool uses Slate UI automation.
+- Visual evidence capture requires a persistent `CameraActor`, rejects paths
+  outside Project `Saved`, settles multiple viewport draws, preserves existing
+  evidence by refusing overwrite, atomically moves a verified temporary PNG
+  and receipt into place, and verifies the final byte count and SHA-256 before
+  return.
 
 See `docs/FAB_HEADLESS_PROTOTYPE.md` for the prototype contract, verification
 limits, and the requirements for a future safe download implementation.
@@ -239,6 +277,7 @@ The GitHub repository and release process are specified in
 - Security policy: `SECURITY.md`
 - Extension design contract: `docs/TOOLSETS_EXTENSION_GUIDELINES.md`
 - Usefulness-information design: `docs/USEFULNESS_INFORMATION.md`
+- Visual evidence rationale and contract: `docs/VISUAL_EVIDENCE_TOOLSET.md`
 - Capability roadmap, including the guarded Fab scope: `docs/ROADMAP.md`
 
 Use GitHub Issues for reproducible feature requests and non-sensitive bugs.

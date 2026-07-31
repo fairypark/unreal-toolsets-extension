@@ -54,6 +54,15 @@ implemented against public Unreal APIs.
 - manual Fab-window download handoff with time-filtered observation of completed
   top-level ZIP cache entries
 
+### VisualEvidenceExtensionToolset
+
+- persistent `CameraActor`-bound, UI-clean PNG capture beneath Project `Saved`
+- compilation, streaming, warmup, and consecutive-frame stability gates
+- atomic PNG and JSON receipt creation with SHA-256 trust anchors
+- camera, world, complete view-state, dimensions, timestamp, and settlement
+  verification immediately before independent supervision
+- viewport-state restoration and fail-closed overwrite, path, and tamper guards
+
 ## Under evaluation
 
 ### Landscape and placement follow-ups
@@ -81,6 +90,13 @@ represent a caller-supplied URL as an ownership-verified download.
 
 Cache deletion may be considered later with explicit expected-path,
 expected-size, and expected-entry-count guards.
+
+### Visual evidence follow-ups
+
+- additional supported-Engine fixtures for deterministic render-state failure
+  injection and save-failure rollback coverage
+- optional client-side visual-quality supervision that consumes verified PNGs;
+  quality scoring remains outside the Unreal Toolset
 
 ## Candidate domains
 

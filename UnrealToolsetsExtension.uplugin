@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
-  "Version": 3,
-  "VersionName": "0.3.0",
+  "Version": 4,
+  "VersionName": "0.4.0",
   "FriendlyName": "Unreal Toolsets Extension",
   "Description": "Independent, unofficial ToolsetRegistry extensions that complement, but never modify, Epic's Unreal Engine toolsets.",
   "Category": "AI",
