@@ -25,6 +25,7 @@ public class UnrealToolsetsExtension : ModuleRules
 				"Json",
 				"LandscapeEditor",
 				"Projects",
+				"TypedElementFramework",
 				"UnrealEd"
 			});
 	}

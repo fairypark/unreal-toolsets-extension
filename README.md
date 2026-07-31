@@ -53,13 +53,35 @@ installation.
 - `SetGrassDensityScaling`
 
 `FabExtensionToolset` provides guarded, read-only inspection through Fab's
-public C++ interfaces:
+public C++ interfaces plus an exact-version, headless owned-library search
+prototype:
 
 - `GetFabIntegrationInfo`
 - `GetFabCacheSummary`
 - `ListFabCachedEntries`
 - `GetFabCacheEntryStatus`
 - `GetFabImportTypeSupport`
+- `GetFabOwnedLibrarySearchCapability`
+- `RequestFabOwnedLibrarySync`
+- `GetFabOwnedLibrarySnapshotInfo`
+- `SearchFabOwnedAssets`
+
+The prototype is restricted to Unreal Engine 5.8 and Fab plugin version
+`0.0.14` (`Version` 14). It submits Fab's internal TEDS My Library command and
+reads only reflected product metadata. The current Editor process must already
+have an active Fab login session; Fab does not expose a public headless login
+initializer. The prototype never reads or exposes credentials, account ids,
+cookies, or signed download URLs. Because the internal command has no public
+completion signal, callers must poll the snapshot count until it stabilizes and
+results always report that completeness is unknown.
+
+Download initiation remains in Epic's Fab window. A client can record the
+current Unix time, ask the user to click Download, and then poll
+`ListFabCachedEntries` with `ModifiedAfterUnixSeconds` to detect newly completed
+top-level ZIP cache entries without further screen control. Some native Unreal
+content uses an install/Add to Project path instead of the ZIP cache; those
+artifacts must be verified in the destination project rather than inferred from
+this cache tool.
 
 `ObservabilityExtensionToolset` exposes client-neutral, read-only metadata:
 
@@ -71,7 +93,7 @@ stable error codes. It does not enable collection or store usage data.
 
 ## Requirements
 
-- Unreal Engine 5.8 for version `0.2.0`
+- Unreal Engine 5.8.1 for version `0.3.0`
 - the experimental `ToolsetRegistry` plugin
 - the built-in `PCG` plugin
 - the built-in `Fab` plugin
@@ -84,6 +106,37 @@ supported.
 `AllToolsets` and `ModelContextProtocol` are not build dependencies. A project
 needs `ModelContextProtocol` only when it wants to expose registered toolsets
 over MCP.
+
+## Connect this source workspace to Unreal MCP
+
+The three tool-search operations `list_toolsets`, `describe_toolset`, and
+`call_tool` belong to Unreal Engine's `ModelContextProtocol` plugin. They are
+not implemented by this extension. Codex only sees them when the workspace
+being opened contains an MCP client configuration that points to the running
+Editor.
+
+Copy the portable example to a machine-local configuration:
+
+```powershell
+Copy-Item .\.codex\config.toml.example .\.codex\config.toml
+```
+
+Then update its URL to match the Editor's
+`ServerPortNumber` and `ServerUrlPath`. The local file is intentionally ignored
+by Git because the endpoint is machine-specific. Start a new Codex task after
+creating or changing the configuration; MCP servers are connected when the
+task starts.
+
+The connection can be verified without driving the Editor UI:
+
+```powershell
+.\scripts\Test-UnrealMcpConnection.ps1 `
+  -Endpoint http://localhost:8000/mcp
+```
+
+The test initializes an MCP session and fails unless `tools/list` returns all
+three tool-search meta-tools. It never reads or prints credentials, cookies, or
+session identifiers.
 
 ## Build a distributable package
 
@@ -134,7 +187,7 @@ different Engine version.
 - Heightmap and weightmap imports require an exact full-Landscape resolution.
 - Mutations refuse regions with unloaded World Partition components.
 - `CreateLandscape` currently refuses World Partition worlds because version
-  `0.2.0` does not create streaming proxies.
+  `0.3.0` does not create streaming proxies.
 - Reimport validates the recorded source, saves a recovery point, captures the
   original height data, verifies the complete write plus representative points,
   and rolls back on failure.
@@ -161,12 +214,17 @@ different Engine version.
   ranges, then mark the asset package dirty without saving it. Replacing a
   variety intentionally resets per-platform and per-quality overrides to the
   supplied defaults.
-- Fab inspection uses only the public Fab module, cache, and workflow-factory
-  interfaces. It reads top-level cached ZIP metadata and exact import-type
-  registration without inspecting authentication, querying marketplace
-  services, inferring ownership, downloading content, installing plugins, or
-  clearing the cache.
+- Fab cache inspection uses the public Fab module, cache, and workflow-factory
+  interfaces. The optional UE 5.8 owned-library prototype invokes an internal
+  console command and reads a private reflected TEDS schema behind an exact
+  Fab-version gate. It never accesses authentication values, account ids,
+  signed URLs, payment data, download initiation, installation, or cache
+  deletion. After a user starts a download in the Fab window, it can inspect
+  and time-filter completed top-level ZIP cache entries.
 - No tool uses Slate UI automation.
+
+See `docs/FAB_HEADLESS_PROTOTYPE.md` for the prototype contract, verification
+limits, and the requirements for a future safe download implementation.
 
 Follow `docs/TOOLSETS_EXTENSION_GUIDELINES.md` when adding another domain
 toolset. Runtime module, class, schema, error, and package

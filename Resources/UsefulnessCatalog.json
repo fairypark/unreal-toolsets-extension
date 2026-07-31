@@ -306,6 +306,42 @@
       "persistence": "none",
       "may_dry_run": false,
       "may_attempt_rollback": false
+    },
+    {
+      "toolset": "FabExtensionToolset",
+      "operation": "GetFabOwnedLibrarySearchCapability",
+      "class": "read",
+      "verification": "none",
+      "persistence": "none",
+      "may_dry_run": false,
+      "may_attempt_rollback": false
+    },
+    {
+      "toolset": "FabExtensionToolset",
+      "operation": "RequestFabOwnedLibrarySync",
+      "class": "mutation",
+      "verification": "none",
+      "persistence": "none",
+      "may_dry_run": false,
+      "may_attempt_rollback": false
+    },
+    {
+      "toolset": "FabExtensionToolset",
+      "operation": "GetFabOwnedLibrarySnapshotInfo",
+      "class": "read",
+      "verification": "none",
+      "persistence": "none",
+      "may_dry_run": false,
+      "may_attempt_rollback": false
+    },
+    {
+      "toolset": "FabExtensionToolset",
+      "operation": "SearchFabOwnedAssets",
+      "class": "read",
+      "verification": "none",
+      "persistence": "none",
+      "may_dry_run": false,
+      "may_attempt_rollback": false
     }
   ],
   "errors": [
@@ -314,6 +350,10 @@
     { "code": "FAB_EXTENSION_ASSET_ID_INVALID", "category": "invalid_request", "verified_rollback": false },
     { "code": "FAB_EXTENSION_CACHE_LIST_REQUEST_INVALID", "category": "invalid_request", "verified_rollback": false },
     { "code": "FAB_EXTENSION_IMPORT_TYPE_INVALID", "category": "invalid_request", "verified_rollback": false },
+    { "code": "FAB_EXTENSION_LIBRARY_QUERY_FAILED", "category": "execution", "verified_rollback": false },
+    { "code": "FAB_EXTENSION_LIBRARY_SEARCH_REQUEST_INVALID", "category": "invalid_request", "verified_rollback": false },
+    { "code": "FAB_EXTENSION_LIBRARY_SYNC_REQUEST_INVALID", "category": "invalid_request", "verified_rollback": false },
+    { "code": "FAB_EXTENSION_LIBRARY_UNAVAILABLE", "category": "unsupported", "verified_rollback": false },
     { "code": "LANDSCAPE_EXTENSION_BATCH_VERIFY_FAILED_ROLLED_BACK", "category": "verification", "verified_rollback": true },
     { "code": "LANDSCAPE_EXTENSION_CREATE_SAVE_FAILED", "category": "save", "verified_rollback": false },
     { "code": "LANDSCAPE_EXTENSION_CREATE_VERIFY_FAILED", "category": "verification", "verified_rollback": false },

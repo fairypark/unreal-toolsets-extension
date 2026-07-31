@@ -9,6 +9,27 @@ PLUGIN_ROOT = REPO_ROOT
 
 
 class UnrealExtensionDistributionTests(unittest.TestCase):
+    def test_codex_mcp_example_is_portable_and_local_config_is_ignored(self):
+        example = (
+            PLUGIN_ROOT / ".codex" / "config.toml.example"
+        ).read_text(encoding="utf-8")
+        gitignore = (PLUGIN_ROOT / ".gitignore").read_text(encoding="utf-8")
+        probe = (
+            PLUGIN_ROOT / "scripts" / "Test-UnrealMcpConnection.ps1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("[mcp_servers.unreal-mcp]", example)
+        self.assertIn('url = "http://127.0.0.1:8000/mcp"', example)
+        self.assertNotIn("8008", example)
+        self.assertIn("/.codex/config.toml", gitignore)
+        for tool_name in ("list_toolsets", "describe_toolset", "call_tool"):
+            self.assertIn(tool_name, probe)
+        self.assertIn("Mcp-Session-Id", probe)
+        self.assertNotRegex(
+            probe,
+            r"(?i)(authorization|bearer|cookie|token)",
+        )
+
     def test_descriptor_is_editor_only_and_independent_of_all_toolsets(self):
         descriptor = json.loads(
             (PLUGIN_ROOT / "UnrealToolsetsExtension.uplugin").read_text(encoding="utf-8")
@@ -70,7 +91,6 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "UnregisterToolsetClass(UObservabilityExtensionToolset::StaticClass())",
             module,
         )
-
     def test_observability_catalog_matches_public_tools_and_safe_errors(self):
         catalog = json.loads(
             (PLUGIN_ROOT / "Resources" / "UsefulnessCatalog.json").read_text(
@@ -97,7 +117,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             item["operation"] for item in catalog["operations"]
         }
         self.assertEqual(reflected_operations, catalog_operations)
-        self.assertEqual(34, len(catalog["operations"]))
+        self.assertEqual(38, len(catalog["operations"]))
         self.assertEqual(
             len(catalog["operations"]),
             len(
@@ -122,7 +142,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         )
         catalog_errors = {item["code"] for item in catalog["errors"]}
         self.assertEqual(raised_codes, catalog_errors)
-        self.assertEqual(55, len(catalog_errors))
+        self.assertEqual(59, len(catalog_errors))
         self.assertTrue(
             all(
                 set(item)
@@ -257,7 +277,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         self.assertIn("MarkPackageDirty", implementation)
         self.assertNotIn("SavePackage", implementation)
 
-    def test_fab_extension_is_read_only_and_uses_public_surfaces(self):
+    def test_fab_extension_keeps_headless_prototype_credential_free(self):
         header = (
             PLUGIN_ROOT
             / "Source"
@@ -278,15 +298,24 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "ListFabCachedEntries",
             "GetFabCacheEntryStatus",
             "GetFabImportTypeSupport",
+            "GetFabOwnedLibrarySearchCapability",
+            "RequestFabOwnedLibrarySync",
+            "GetFabOwnedLibrarySnapshotInfo",
+            "SearchFabOwnedAssets",
         ):
             self.assertIn(f"{function_name}(", header)
-        self.assertEqual(5, header.count("meta = (AICallable)"))
+        self.assertEqual(9, header.count("meta = (AICallable)"))
         for public_surface in (
             "Utilities/FabAssetsCache.h",
             "FabWorkflowFactoryRegistry.h",
             "IPluginManager",
+            "TypedElementDataStorageInterface.h",
+            "TypedElementQueryBuilder.h",
+            "IConsoleManager",
         ):
             self.assertIn(public_surface, implementation)
+        self.assertIn("Fab.TEDS.MyFolderIntegration", implementation)
+        self.assertIn("/Script/Fab.FabObjectColumn", implementation)
         for forbidden in (
             "FabAuthentication",
             "FabBrowserApi",
@@ -296,6 +325,9 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "Http",
             "Cookie",
             "Token",
+            "Authorization",
+            "Bearer",
+            "SignedUrl",
         ):
             self.assertNotIn(forbidden, implementation)
 
@@ -366,7 +398,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         )
         for required in (
             "unreal-toolsets-extension",
-            "unreal-toolsets-v0.2.0",
+            "unreal-toolsets-v0.3.0",
             "Claude, Codex, and other MCP users",
             "protected tags",
             "Never run untrusted pull-request code",

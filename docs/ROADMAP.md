@@ -47,7 +47,12 @@ implemented against public Unreal APIs.
 - cache directory, total size, top-level ZIP count, and modification range
 - bounded, prefix-filtered cached-entry listing and exact entry lookup
 - exact asset-type checks through Fab's public workflow factory registry
-- no authentication, marketplace, entitlement, download, install, or deletion access
+- UE 5.8.1/Fab 0.0.14 exact-version prototype for headless My Library TEDS sync,
+  snapshot inspection, and owned-product metadata search
+- no authentication-value, signed-URL, download-initiation, install, purchase,
+  or deletion access
+- manual Fab-window download handoff with time-filtered observation of completed
+  top-level ZIP cache entries
 
 ## Under evaluation
 
@@ -62,11 +67,17 @@ implemented against public Unreal APIs.
 
 ### Fab follow-ups
 
-Marketplace search, My Library synchronization, ownership checks, signed URL
-generation, Add to Project, and plugin installation are not planned until Epic
-provides stable public service interfaces. The extension will not include
-private Fab headers, reflect private browser bridges, collect tokens or
-cookies, or represent a caller-supplied URL as an ownership-verified download.
+The exact-version headless search prototype is intentionally not a stable
+compatibility promise. Replace its console-command and reflected-schema adapter
+when Epic exports a supported owned-library service.
+
+Signed URL generation, automated download initiation, Add to Project, and
+plugin installation remain
+blocked until Epic provides a service operation that accepts an owned asset id
+and keeps entitlement checks, credentials, and transient URLs inside the Fab
+module. The extension will not include private Fab headers, reflect private
+browser bridges, collect tokens or cookies, accept signed URLs through MCP, or
+represent a caller-supplied URL as an ownership-verified download.
 
 Cache deletion may be considered later with explicit expected-path,
 expected-size, and expected-entry-count guards.
