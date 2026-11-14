@@ -8,6 +8,8 @@
 #include "HAL/PlatformTime.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/CommandLine.h"
+#include "Misc/EngineVersion.h"
+#include "Modules/ModuleManager.h"
 #include "Misc/Parse.h"
 #include "UObject/UObjectGlobals.h"
 #include "UObject/UnrealType.h"
@@ -67,7 +69,7 @@ bool FFabExtensionReadOnlyTest::RunTest(const FString& Parameters)
 
 	const FFabExtensionLibraryCapability LibraryCapability =
 		UFabExtensionToolset::GetFabOwnedLibrarySearchCapability();
-	TestEqual(TEXT("Fab prototype version is reported"), LibraryCapability.FabVersion, 14);
+	TestEqual(TEXT("Installed Fab version is reported"), LibraryCapability.FabVersion, Integration.Version);
 	TestTrue(
 		TEXT("Fab prototype declares its private reflected schema dependency"),
 		LibraryCapability.bUsesPrivateReflectedSchema);
@@ -110,6 +112,82 @@ bool FFabExtensionReadOnlyTest::RunTest(const FString& Parameters)
 			TEXT("Search never claims snapshot completeness"),
 			Search.bSnapshotCompletenessKnown);
 	}
+	return true;
+}
+
+// Passive reflection only: no login, network, sync, download, or install calls.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFabExtensionCompatibilityTest,
+	"AI.UnrealToolsetsExtension.Fab.CompatibilityDiscovery",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFabExtensionCompatibilityTest::RunTest(const FString& Parameters)
+{
+	const FFabExtensionIntegrationInfo Integration =
+		UFabExtensionToolset::GetFabIntegrationInfo();
+	const FFabExtensionLibraryCapability Capability =
+		UFabExtensionToolset::GetFabOwnedLibrarySearchCapability();
+	const FEngineVersion EngineVersion = FEngineVersion::Current();
+	const bool bLegacyVersion = EngineVersion.GetMajor() == 5
+		&& EngineVersion.GetMinor() == 8 && Integration.Version == 14;
+	if (!Integration.bPluginInstalled || !Integration.bPluginEnabled || !Integration.bModuleLoaded)
+	{
+		TestTrue(TEXT("Unavailable plugin keeps legacy status"),
+			Capability.Status == EFabExtensionLibraryCapabilityStatus::FabPluginUnavailable);
+		TestFalse(TEXT("Unavailable plugin cannot enable legacy path"), Capability.bAvailable);
+	}
+	else if (!bLegacyVersion)
+	{
+		TestTrue(TEXT("Other Engine/Fab versions stay blocked, including UE 5.9/Fab 22"),
+			Capability.Status == EFabExtensionLibraryCapabilityStatus::UnsupportedFabPluginVersion);
+		TestFalse(TEXT("Official discovery never unlocks private TEDS"), Capability.bAvailable);
+	}
+	else if (IsRunningCommandlet())
+	{
+		TestTrue(TEXT("Exact legacy version still refuses commandlets"),
+			Capability.Status == EFabExtensionLibraryCapabilityStatus::RunningCommandlet);
+		TestFalse(TEXT("Commandlets cannot enable legacy path"), Capability.bAvailable);
+	}
+	TestEqual(TEXT("Availability agrees with legacy status"), Capability.bAvailable,
+		Capability.Status == EFabExtensionLibraryCapabilityStatus::Available);
+
+	const UClass* OfficialClass = FindObject<UClass>(
+		nullptr, TEXT("/Script/FabToolset.FabToolset"));
+	TestEqual(TEXT("Reports optional module without loading it"),
+		Capability.bOfficialToolsetModuleLoaded,
+		FModuleManager::Get().IsModuleLoaded(TEXT("FabToolset")));
+	TestEqual(TEXT("Reports loaded official reflection"),
+		Capability.bOfficialToolsetClassPresent, OfficialClass != nullptr);
+	const FName FunctionNames[] = {
+		TEXT("SearchFabMyLibrary"), TEXT("SearchFabListings"), TEXT("GetFabListingDetails")
+	};
+	int32 ExpectedCount = 0;
+	for (const FName FunctionName : FunctionNames)
+	{
+		bool bExpected = false;
+#if WITH_METADATA
+		const UFunction* Function = OfficialClass != nullptr
+			? OfficialClass->FindFunctionByName(FunctionName) : nullptr;
+		bExpected = Capability.bOfficialToolsetModuleLoaded
+			&& OfficialClass != nullptr
+			&& OfficialClass->IsChildOf(UToolsetDefinition::StaticClass())
+			&& Function != nullptr && Function->HasAnyFunctionFlags(FUNC_Static)
+			&& Function->HasMetaData(TEXT("AICallable"))
+			&& !Function->HasMetaData(TEXT("AIIgnore"));
+#endif
+		const FString QualifiedName = TEXT("FabToolset.FabToolset.") + FunctionName.ToString();
+		TestEqual(*FString::Printf(TEXT("Observed function %s"), *QualifiedName),
+			Capability.OfficialReflectedToolNames.Contains(QualifiedName), bExpected);
+		ExpectedCount += bExpected ? 1 : 0;
+		if (FunctionName == FName(TEXT("SearchFabMyLibrary")))
+		{
+			TestEqual(TEXT("Recommendation requires observed official library function"),
+				Capability.RecommendedOwnedLibraryTool,
+				bExpected ? QualifiedName : FString());
+		}
+	}
+	TestEqual(TEXT("Only read-only official search/detail functions are advertised"),
+		Capability.OfficialReflectedToolNames.Num(), ExpectedCount);
 	return true;
 }
 

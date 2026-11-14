@@ -177,6 +177,27 @@ struct FFabExtensionLibraryCapability
 	/** Completed top-level ZIP cache entries can be inspected and time-filtered. */
 	UPROPERTY(BlueprintReadOnly, Category = "FabExtensionToolset")
 	bool bCanObserveCompletedZipCacheEntries = true;
+
+	/** Observation only: does not load FabToolset or prove registry/host visibility. */
+	UPROPERTY(BlueprintReadOnly, Category = "FabExtensionToolset")
+	bool bOfficialToolsetModuleLoaded = false;
+
+	/** Loaded reflected class, independent of legacy prototype availability. */
+	UPROPERTY(BlueprintReadOnly, Category = "FabExtensionToolset")
+	bool bOfficialToolsetClassPresent = false;
+
+	/** Qualified names of reflected static AICallable search/detail functions actually present.
+	 * Confirm each with the host registry before invoking; filters can hide reflected functions.
+	 * Presence does not establish authentication, network success, or entitlement.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "FabExtensionToolset")
+	TArray<FString> OfficialReflectedToolNames;
+
+	/** Prefer this official owned-library operation when non-empty and exposed by the host.
+	 * Empty means it was not observed, not that the library is empty.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "FabExtensionToolset")
+	FString RecommendedOwnedLibraryTool;
 };
 
 USTRUCT(BlueprintType)
@@ -305,42 +326,42 @@ class UFabExtensionToolset : public UToolsetDefinition
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static FFabExtensionIntegrationInfo GetFabIntegrationInfo();
 
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static FFabExtensionCacheSummary GetFabCacheSummary();
 
 	/** Returns an empty array when no cache entries match the request. */
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static TArray<FFabExtensionCacheEntry> ListFabCachedEntries(
 		const FFabExtensionCacheListRequest& Request);
 
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static FFabExtensionCacheEntryStatus GetFabCacheEntryStatus(
 		const FString& AssetId);
 
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static FFabExtensionImportTypeSupport GetFabImportTypeSupport(
 		const FString& AssetType);
 
-	/** Reports whether the exact Fab version and reflected TEDS schema required by the prototype are present. */
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	/** Reports legacy prototype availability plus passive discovery of official Fab search tools. */
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static FFabExtensionLibraryCapability GetFabOwnedLibrarySearchCapability();
 
 	/**
 	 * Replaces Fab's ephemeral TEDS My Library snapshot asynchronously.
 	 * Call GetFabOwnedLibrarySnapshotInfo until the row count stabilizes before searching.
 	 */
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "FabExtensionToolset")
 	static FFabExtensionLibrarySyncReceipt RequestFabOwnedLibrarySync(
 		int32 BatchSize = 1000);
 
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static FFabExtensionLibrarySnapshotInfo GetFabOwnedLibrarySnapshotInfo();
 
 	/** Searches only the currently visible owned-library snapshot; it never searches public marketplace listings. */
-	UFUNCTION(meta = (AICallable), Category = "FabExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "FabExtensionToolset")
 	static FFabExtensionOwnedAssetSearchResult SearchFabOwnedAssets(
 		const FFabExtensionOwnedAssetSearchRequest& Request);
 };

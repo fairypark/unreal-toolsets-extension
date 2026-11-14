@@ -37,6 +37,10 @@ jobs:
           if ($tagCommit -ne $env:GITHUB_SHA) {
             throw "Selected tag does not resolve to the checked-out commit."
           }
+          $descriptor = Get-Content -Raw .\UnrealToolsetsExtension.uplugin | ConvertFrom-Json
+          if ($env:GITHUB_REF_NAME -cne "unreal-toolsets-v$($descriptor.VersionName)") {
+            throw "Selected tag does not match the plugin descriptor version."
+          }
           $notes = Join-Path $env:GITHUB_WORKSPACE (
             "docs\releases\$($env:GITHUB_REF_NAME).md"
           )
@@ -65,8 +69,8 @@ jobs:
             -EngineRoot $env:ENGINE_ROOT `
             -OutputDirectory $output `
             -SourceCommit $env:GITHUB_SHA `
-            -EngineVersionLabel "UE5.8.1" `
             -TargetPlatforms "Win64"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "RELEASE_ASSET_DIRECTORY=$output" | Out-File `
             -FilePath $env:GITHUB_ENV `
             -Encoding utf8 `
@@ -86,6 +90,7 @@ jobs:
             ForEach-Object { $_.FullName }
           gh release create $env:GITHUB_REF_NAME `
             --draft `
+            --prerelease `
             --verify-tag `
             --title "Unreal Toolsets Extension $($descriptor.VersionName)" `
             --notes-file $notes `

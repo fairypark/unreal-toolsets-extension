@@ -175,39 +175,39 @@ class UPCGExtensionToolset : public UToolsetDefinition
 
 public:
 	/** Returns an empty array when the weighted selector contains no entries. */
-	UFUNCTION(meta = (AICallable), Category = "PCGExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "PCGExtensionToolset")
 	static TArray<FPCGExtensionWeightedMeshEntry> GetWeightedMeshEntries(UPCGNode* StaticMeshSpawnerNode);
 
-	UFUNCTION(meta = (AICallable), Category = "PCGExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "PCGExtensionToolset")
 	static FPCGExtensionWeightedMeshMutation ReplaceWeightedMeshEntries(
 		UPCGNode* StaticMeshSpawnerNode,
 		const TArray<FPCGExtensionWeightedMeshEntryRequest>& Entries);
 
-	UFUNCTION(meta = (AICallable), Category = "PCGExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "PCGExtensionToolset")
 	static FPCGExtensionWeightedMeshMutation AddWeightedMeshEntry(
 		UPCGNode* StaticMeshSpawnerNode,
 		const FPCGExtensionWeightedMeshEntryRequest& Entry,
 		int32 InsertIndex = -1);
 
-	UFUNCTION(meta = (AICallable), Category = "PCGExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "PCGExtensionToolset")
 	static FPCGExtensionWeightedMeshMutation UpdateWeightedMeshEntry(
 		UPCGNode* StaticMeshSpawnerNode,
 		int32 Index,
 		const FPCGExtensionWeightedMeshEntryRequest& Entry);
 
-	UFUNCTION(meta = (AICallable), Category = "PCGExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "PCGExtensionToolset")
 	static FPCGExtensionWeightedMeshMutation RemoveWeightedMeshEntry(
 		UPCGNode* StaticMeshSpawnerNode,
 		int32 Index);
 
-	UFUNCTION(meta = (AICallable), Category = "PCGExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "PCGExtensionToolset")
 	static FPCGExtensionWeightedMeshMutation ReorderWeightedMeshEntry(
 		UPCGNode* StaticMeshSpawnerNode,
 		int32 FromIndex,
 		int32 ToIndex);
 
 	/** Audits existing managed PCG output without executing or cleaning the graph. */
-	UFUNCTION(meta = (AICallable), Category = "PCGExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "PCGExtensionToolset")
 	static FPCGExtensionGraphAudit AuditGraphInstance(
 		UPCGComponent* Component,
 		const FPCGExtensionGraphAuditRequest& Request);

@@ -1206,7 +1206,11 @@ FVisualEvidenceReceipt UVisualEvidenceExtensionToolset::CaptureCameraToPng(
 	{
 		RaiseError(
 			TEXT("VISUAL_EVIDENCE_RENDER_STATE_UNSETTLED"),
-			TEXT("Compilation or streaming resumed before the stable frame was accepted."));
+			FString::Printf(
+				TEXT("Compilation or streaming resumed before the stable frame was accepted. RemainingAssets=%d ShaderCompilationActive=%d WantingStreamingResources=%d"),
+				Receipt.RemainingAssetCompileCount,
+				Receipt.bShaderCompilationActive ? 1 : 0,
+				Receipt.RemainingStreamingRequests));
 		return {};
 	}
 

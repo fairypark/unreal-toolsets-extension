@@ -585,54 +585,54 @@ class ULandscapeExtensionToolset : public UToolsetDefinition
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionInfoResult GetLandscapeInfo(ALandscapeProxy* Landscape);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionMutationResult CreateLandscape(UWorld* World, const FLandscapeExtensionCreateRequest& Request);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionMutationResult ImportHeightmap(ALandscapeProxy* Landscape, const FLandscapeExtensionHeightmapRequest& Request);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionMutationResult ReimportHeightmap(ALandscapeProxy* Landscape, const FLandscapeExtensionHeightmapRequest& Request);
 
 	/**
 	 * Validates an atomic heightmap and layer-map reimport plan. A null Landscape
 	 * auto-selects only when the Editor world contains exactly one Landscape.
 	 */
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionReimportPreflight PreflightReimportLandscapeData(
 		UWorld* World,
 		ALandscapeProxy* Landscape,
 		const FLandscapeExtensionReimportRequest& Request);
 
 	/** Reimports the validated batch atomically, with a saved recovery point and optional raw-data backup. */
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionMutationResult ReimportLandscapeData(
 		UWorld* World,
 		ALandscapeProxy* Landscape,
 		const FLandscapeExtensionReimportRequest& Request);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionMutationResult ImportWeightmap(
 		ALandscapeProxy* Landscape,
 		ULandscapeLayerInfoObject* LayerInfo,
 		const FLandscapeExtensionWeightmapRequest& Request);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionMutationResult SetLandscapeMaterial(ALandscapeProxy* Landscape, UMaterialInterface* Material);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionHeightStatistics GetHeightStatistics(ALandscapeProxy* Landscape, const FLandscapeExtensionRegion& Region);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionBuildingPadValidation ValidateBuildingPad(
 		ALandscapeProxy* Landscape,
 		const FLandscapeExtensionBuildingPadRequest& Request);
 
 	/** Audits the current streaming proxy layout; proxy count is reported as an outcome, never a target. */
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionProxyAudit AuditStreamingProxies(
 		ALandscapeProxy* Landscape,
 		const FLandscapeExtensionProxyAuditRequest& Request);
@@ -641,11 +641,11 @@ public:
 	 * Reassigns fully loaded Landscape components to a new World Partition grid
 	 * only after dry-run review and explicit confirmation.
 	 */
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionProxyRebuildResult RebuildStreamingProxies(
 		ALandscapeProxy* Landscape,
 		const FLandscapeExtensionProxyRebuildRequest& Request);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeExtensionToolset")
 	static FLandscapeExtensionSaveResult SaveLandscape(ALandscapeProxy* Landscape);
 };

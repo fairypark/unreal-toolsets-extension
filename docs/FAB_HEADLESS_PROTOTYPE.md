@@ -1,6 +1,64 @@
-# Headless Fab owned-library prototype
+# Fab compatibility and legacy owned-library prototype
 
-## Scope
+## UE 5.9 experimental: prefer official Fab tools
+
+UE 5.9 with Fab descriptor version 22 provides Epic's optional `FabToolset`
+module. Its reflected class is `/Script/FabToolset.FabToolset`, registered by
+`FabToolsetModule` through `UToolsetRegistry::RegisterToolsetClass`.
+The canonical ToolsetRegistry names are:
+
+- `FabToolset.FabToolset.SearchFabMyLibrary`: owned-library search;
+- `FabToolset.FabToolset.SearchFabListings`: public marketplace search, not ownership proof;
+- `FabToolset.FabToolset.GetFabListingDetails`: listing details, not ownership proof.
+
+Use the official owned-library operation on UE 5.9 rather than the extension's
+legacy sync/snapshot/search sequence. Inputs, pagination, and result semantics
+are those of the official tool; the extension does not translate or duplicate
+that API. Inspect the current host schema before calling it.
+
+`GetFabOwnedLibrarySearchCapability` now adds passive discovery fields:
+
+- `bOfficialToolsetModuleLoaded`: whether the optional module is already loaded;
+- `bOfficialToolsetClassPresent`: whether its reflected class is already present;
+- `OfficialReflectedToolNames`: only observed static `AICallable` search/detail
+  functions, excluding `AIIgnore`, from that class while its module is loaded;
+- `RecommendedOwnedLibraryTool`: the observed official owned-library function,
+  or empty if not observed.
+
+These are reflection observations, not a claim of registry/host visibility,
+authentication, network availability, entitlement, or successful search.
+Registry filters can hide a reflected function. Confirm the recommended name
+through the host's tool discovery. Missing optional tools are not an empty
+library result. Fab loads the optional module only when ToolsetRegistry has
+already loaded; the extension does not force-load it or change module order.
+The capability query never initiates sign-in, network access, search, download,
+or installation. Without reflection metadata, it advertises no function names.
+
+The existing `Status` and `bAvailable` fields still describe **only** the
+UE 5.8/Fab 14 private TEDS prototype. They remain unavailable on UE 5.9,
+even when the new official-tool fields are populated. Existing enum ordering,
+error codes, and download/session flags keep their legacy meanings.
+`RequestFabOwnedLibrarySync`, `GetFabOwnedLibrarySnapshotInfo`, and
+`SearchFabOwnedAssets` fail closed outside the original version gate with
+`FAB_EXTENSION_LIBRARY_UNAVAILABLE`; the detail now gives migration guidance.
+No private schema checks or synchronization run after a version-gate failure.
+
+The installed UE 5.9 Fab sources also expose official session/install and
+`IFabModule` APIs. This extension does not invoke or wrap those operations.
+Its `bCanInitiateDownloads = false` and manual-download flag describe the
+extension, not the capabilities of Epic's separate official tools. Installation
+remains an independently authorized action, never a compatibility check.
+
+Compatibility discovery and version-gate tests do not prove live service or
+packaged binary compatibility. UE 5.9 remains experimental pending separate
+build/runtime verification. The new C++ test
+`AI.UnrealToolsetsExtension.Fab.CompatibilityDiscovery` passively checks the
+actual Engine/Fab gate and reflected functions without network calls; the
+Python `test_fab_compatibility.py` tests provide static contract regression
+checks, not an Unreal build. The older live-library test remains opt-in and
+applies only to the exact legacy prototype.
+
+## Legacy UE 5.8/Fab 14 scope
 
 The prototype searches products already returned by the authenticated Fab
 plugin's My Library synchronization path without opening or controlling the Fab
@@ -83,9 +141,9 @@ Some Unreal-native Fab products use an Add to Project or install pipeline and
 do not produce a top-level ZIP in this cache. Those products require separate
 destination-project verification.
 
-## Why automated download initiation is still excluded
+## Why the legacy extension excludes automated download initiation
 
-Fab's public `FFabDownloadRequest` can transfer a file only after another
+In the original UE 5.8/Fab 14 evaluation, Fab's public `FFabDownloadRequest` can transfer a file only after another
 component supplies a download URL and destination. The owned-library TEDS
 snapshot does not provide a download URL, artifact selection contract, or a
 public entitlement-to-download operation. Fab's current signed-URL and
@@ -98,7 +156,7 @@ Passing a transient URL through an MCP tool is not an acceptable workaround:
 - a caller-supplied URL does not prove ownership;
 - generic destinations introduce arbitrary-write and cache-integrity risks.
 
-## Acceptable future download design
+## Original UE 5.8 future download criteria
 
 A safe download tool requires Epic to export an operation equivalent to:
 
@@ -124,7 +182,7 @@ to a project must remain a separate, explicitly requested operation with
 destination validation, source-control guidance, postcondition checks, and
 format-specific handling.
 
-## Download path evaluation
+## Original UE 5.8 download path evaluation
 
 | Candidate | Current assessment | Reason |
 | --- | --- | --- |
@@ -175,5 +233,6 @@ Every Engine or Fab plugin update requires:
 5. MCP schema inspection;
 6. empty, partial, filtered, and large-library search tests.
 
-When Epic exposes an owned-library service, migrate to it and remove the
-console-command/reflection adapter.
+UE 5.9 now exposes official owned-library search. Prefer it as described above.
+Retain the guarded legacy adapter for UE 5.8/Fab 14 compatibility; remove it
+only in a future breaking release rather than silently changing its semantics.
