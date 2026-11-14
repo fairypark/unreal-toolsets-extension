@@ -83,6 +83,9 @@ function Send-McpRequest {
     catch {
         throw "$Operation could not reach the MCP endpoint."
     }
+    finally {
+        $Request.Dispose()
+    }
     if (-not $Response.IsSuccessStatusCode) {
         $StatusCode = [int] $Response.StatusCode
         $Response.Dispose()
@@ -136,6 +139,10 @@ function Invoke-McpTool {
     if ($Payload.error) {
         throw "$ToolName returned JSON-RPC error $($Payload.error.code)."
     }
+    if ($Payload.id -ne $RequestId -or $Payload.result -isnot [PSCustomObject] -or
+        $Payload.result.content -isnot [array]) {
+        throw "$ToolName returned a malformed tool result."
+    }
     if ($Payload.result.isError -eq $true) {
         throw "$ToolName returned an MCP tool error."
     }
@@ -168,7 +175,9 @@ function ConvertFrom-McpToolText {
     }
 }
 
-$Client = [System.Net.Http.HttpClient]::new()
+$Handler = [System.Net.Http.HttpClientHandler]::new()
+$Handler.AllowAutoRedirect = $false
+$Client = [System.Net.Http.HttpClient]::new($Handler)
 $Client.Timeout = [TimeSpan]::FromSeconds(10)
 
 try {
@@ -239,37 +248,96 @@ try {
         $ToolsListResponse.Dispose()
     }
 
+    if ($ToolsListPayload.error) {
+        throw "tools/list returned JSON-RPC error $($ToolsListPayload.error.code)."
+    }
+    if ($ToolsListPayload.result.tools -isnot [array]) {
+        throw 'tools/list returned a malformed tools array.'
+    }
     $ToolNames = @($ToolsListPayload.result.tools | ForEach-Object { $_.name })
-    $RequiredMetaToolNames = @('list_toolsets', 'describe_toolset', 'call_tool')
+    # Discover the protocol capability, not the engine/server version string.
+    $DescribeToolName = if ('describe_toolsets' -in $ToolNames) {
+        'describe_toolsets'
+    } elseif ('describe_toolset' -in $ToolNames) {
+        'describe_toolset'
+    } else {
+        throw 'MCP tool-search meta-tools are missing: describe_toolset or describe_toolsets.'
+    }
+    $RequiredMetaToolNames = @('list_toolsets', $DescribeToolName, 'call_tool')
     $MissingToolNames = @($RequiredMetaToolNames | Where-Object { $_ -notin $ToolNames })
     if ($MissingToolNames.Count -gt 0) {
         throw "MCP tool-search meta-tools are missing: $($MissingToolNames -join ', ')."
     }
 
-    [void] (Invoke-McpTool `
+    $CatalogPayload = Invoke-McpTool `
         -Client $Client `
         -SessionId $SessionId `
         -RequestId 3 `
         -ToolName 'list_toolsets' `
-        -Arguments @{})
+        -Arguments @{}
+    # Epic's catalog is plain text in both supported versions, not JSON.
+    $CatalogNames = @(
+        foreach ($Content in $CatalogPayload.result.content) {
+            if ($Content.type -eq 'text') {
+                foreach ($Line in ($Content.text -split "`r?`n")) {
+                    if ($Line -match '^- ([A-Za-z0-9_.]+)(?::|$)') { $Matches[1] }
+                }
+            }
+        }
+    )
+    if ($CatalogNames.Count -eq 0) {
+        throw 'list_toolsets returned no recognizable toolset names.'
+    }
     $DescribedToolsetName = if ($ToolsetName) {
         $ToolsetName
     }
     else {
         'ToolsetRegistry.AgentSkillToolset'
     }
+    if ($DescribedToolsetName -cnotin $CatalogNames) {
+        # Use exact advertised class names. Similar names across engine releases
+        # do not imply identical operation contracts.
+        throw "Requested toolset is not advertised: $DescribedToolsetName. Use list_toolsets to discover its current qualified name."
+    }
+    $DescribeArguments = if ($DescribeToolName -eq 'describe_toolsets') {
+        @{ toolset_names = @($DescribedToolsetName); include_schemas = $true }
+    } else {
+        @{ toolset_name = $DescribedToolsetName }
+    }
     $DescribePayload = Invoke-McpTool `
         -Client $Client `
         -SessionId $SessionId `
         -RequestId 4 `
-        -ToolName 'describe_toolset' `
-        -Arguments @{
-            toolset_name = $DescribedToolsetName
-        }
+        -ToolName $DescribeToolName `
+        -Arguments $DescribeArguments
     $Description = ConvertFrom-McpToolText `
         -Payload $DescribePayload `
-        -Operation 'describe_toolset'
-    if ($ToolsetName) {
+        -Operation $DescribeToolName
+    if ($DescribeToolName -eq 'describe_toolsets') {
+        if ($Description.toolsets -isnot [PSCustomObject] -or
+            $Description.errors -isnot [PSCustomObject]) {
+            throw 'describe_toolsets returned a malformed response wrapper.'
+        }
+        if (@($Description.errors.PSObject.Properties).Count -gt 0) {
+            throw 'describe_toolsets returned per-toolset errors.'
+        }
+        $Entry = $Description.toolsets.PSObject.Properties |
+            Where-Object { $_.Name -ceq $DescribedToolsetName }
+        if (-not $Entry) {
+            throw 'describe_toolsets did not return the requested toolset.'
+        }
+        $Description = $Entry.Value
+    }
+    if ($Description -isnot [PSCustomObject] -or $Description.tools -isnot [array]) {
+        throw "$DescribeToolName returned a malformed toolset description."
+    }
+    foreach ($Tool in $Description.tools) {
+        $Name = if ($Tool.name) { $Tool.name } else { $Tool.tool_name }
+        if ($Name -isnot [string] -or -not $Name) {
+            throw "$DescribeToolName returned an operation without a name."
+        }
+    }
+    if ($NormalizedRequiredOperationNames.Count -gt 0) {
         $DescribedOperationNames = @(
             $Description.tools | ForEach-Object {
                 if ($_.name) { $_.name } elseif ($_.tool_name) { $_.tool_name }
@@ -280,12 +348,13 @@ try {
                 Where-Object {
                     $RequiredName = $_
                     -not ($DescribedOperationNames | Where-Object {
-                        $_ -eq $RequiredName -or $_.EndsWith(".$RequiredName")
+                        $_ -ceq $RequiredName -or
+                            ($RequiredName -notlike '*.*' -and $_ -ceq "$DescribedToolsetName.$RequiredName")
                     })
                 }
         )
         if ($MissingOperationNames.Count -gt 0) {
-            throw "Required operations are missing from ${ToolsetName}: $($MissingOperationNames -join ', ')."
+            throw "Required operations are missing from ${DescribedToolsetName}: $($MissingOperationNames -join ', ')."
         }
     }
     [void] (Invoke-McpTool `

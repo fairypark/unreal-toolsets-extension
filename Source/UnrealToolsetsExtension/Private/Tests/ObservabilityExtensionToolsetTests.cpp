@@ -65,6 +65,25 @@ bool FObservabilityExtensionCatalogTest::RunTest(const FString& Parameters)
 			*Descriptor.OperationName);
 		TestTrue(*FString::Printf(TEXT("Catalog operation is unique: %s"), *Key), !CatalogOperations.Contains(Key));
 		CatalogOperations.Add(Key);
+		const UClass* const* MatchingClass = ToolsetClasses.FindByPredicate(
+			[&Descriptor](const UClass* Class)
+			{
+				return Class->GetName() == Descriptor.ToolsetName;
+			});
+		const UFunction* Function = MatchingClass != nullptr
+			? (*MatchingClass)->FindFunctionByName(FName(*Descriptor.OperationName))
+			: nullptr;
+		if (TestNotNull(*FString::Printf(TEXT("Catalog function exists: %s"), *Key), Function))
+		{
+			const bool bReadOnly =
+				Descriptor.OperationClass == EUnrealToolsetsExtensionOperationClass::Discovery
+				|| Descriptor.OperationClass == EUnrealToolsetsExtensionOperationClass::Read
+				|| Descriptor.OperationClass == EUnrealToolsetsExtensionOperationClass::Validation;
+			TestEqual(
+				*FString::Printf(TEXT("Access mode matches operation semantics: %s"), *Key),
+				Function->GetMetaData(TEXT("AIAccessMode")),
+				FString(bReadOnly ? TEXT("Read") : TEXT("Write")));
+		}
 	}
 	TestEqual(TEXT("Catalog operation count"), CatalogOperations.Num(), 40);
 	bool bCatalogMatchesReflection =

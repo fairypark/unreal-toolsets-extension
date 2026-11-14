@@ -245,7 +245,7 @@ public:
 	 * Captures a current-world CameraActor, writes a unique PNG plus evidence receipt,
 	 * verifies both, and restores the viewport state.
 	 */
-	UFUNCTION(meta = (AICallable), Category = "VisualEvidenceExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "VisualEvidenceExtensionToolset")
 	static FVisualEvidenceReceipt CaptureCameraToPng(
 		ACameraActor* CameraActor,
 		const FVisualEvidenceCaptureRequest& Request);
@@ -255,7 +255,7 @@ public:
 	 * Raises when camera identity or state, provenance, dimensions, hash, UI-clean
 	 * status, or temporal and streaming settlement no longer matches.
 	 */
-	UFUNCTION(meta = (AICallable), Category = "VisualEvidenceExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "VisualEvidenceExtensionToolset")
 	static FVisualEvidenceReceipt VerifyEvidenceForSupervision(
 		ACameraActor* ExpectedCameraActor,
 		const FVisualEvidenceVerificationRequest& Request);

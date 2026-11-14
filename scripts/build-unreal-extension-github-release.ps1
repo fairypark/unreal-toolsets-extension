@@ -9,8 +9,9 @@ param(
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
     [string]$SourceCommit,
 
-    [string]$EngineVersionLabel = "UE5.8",
+    [string]$EngineVersionLabel,
 
+    [ValidatePattern("^[A-Za-z0-9]+(\+[A-Za-z0-9]+)*$")]
     [string]$TargetPlatforms = "Win64"
 )
 
@@ -63,18 +64,32 @@ if ([string]::IsNullOrWhiteSpace($pluginVersion)) {
     throw "The plugin descriptor has no VersionName."
 }
 
-$safeEngineLabel = $EngineVersionLabel -replace "[^A-Za-z0-9._-]", "-"
-$safePlatforms = $TargetPlatforms -replace "[^A-Za-z0-9._+-]", "-"
-$assetBaseName = "UnrealToolsetsExtension-$pluginVersion-$safeEngineLabel-$safePlatforms"
+$buildVersionPath = Join-Path $EngineRoot "Engine\Build\Build.version"
+$buildVersion = Get-Content -Raw -LiteralPath $buildVersionPath | ConvertFrom-Json
+foreach ($field in @("MajorVersion", "MinorVersion", "PatchVersion", "Changelist")) {
+    $value = $buildVersion.$field
+    if (($value -isnot [int] -and $value -isnot [long]) -or $value -lt 0) {
+        throw "Invalid $field in Engine/Build/Build.version."
+    }
+}
+$engineLabel = "UE{0}.{1}.{2}" -f $buildVersion.MajorVersion, $buildVersion.MinorVersion, $buildVersion.PatchVersion
+if ($PSBoundParameters.ContainsKey("EngineVersionLabel") -and $EngineVersionLabel -cne $engineLabel) {
+    throw "EngineVersionLabel must match the installed build ($engineLabel)."
+}
+$platforms = @($TargetPlatforms -split "\+")
+$assetBaseName = "UnrealToolsetsExtension-$pluginVersion-$engineLabel-CL$($buildVersion.Changelist)-$TargetPlatforms"
 $assetFileName = "$assetBaseName.zip"
 $assetPath = Join-Path $resolvedOutput $assetFileName
 $checksumFileName = "$assetFileName.sha256"
 $checksumPath = Join-Path $resolvedOutput $checksumFileName
-$manifestPath = Join-Path $resolvedOutput "release-manifest.json"
+$manifestPath = Join-Path $resolvedOutput "$assetBaseName.manifest.json"
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 
+$createdStage = $false
+$createdOutput = $false
 try {
     New-Item -ItemType Directory -Path $stagingRoot | Out-Null
+    $createdStage = $true
 
     & $packageScript `
         -EngineRoot $EngineRoot `
@@ -85,14 +100,40 @@ try {
         throw "Unreal extension packaging failed with exit code $LASTEXITCODE."
     }
 
+    foreach ($platform in $platforms) {
+        $moduleFile = Join-Path $packageDirectory "Binaries\$platform\UnrealEditor.modules"
+        $modules = Get-Content -Raw -LiteralPath $moduleFile | ConvertFrom-Json
+        $binary = [string]$modules.Modules.UnrealToolsetsExtension
+        if (-not $binary -or $binary -ne [IO.Path]::GetFileName($binary) -or
+            -not (Test-Path -LiteralPath (Join-Path (Split-Path $moduleFile) $binary) -PathType Leaf)) {
+            throw "Missing UnrealToolsetsExtension Editor binary for $platform."
+        }
+    }
     New-Item -ItemType Directory -Path $resolvedOutput | Out-Null
-    Compress-Archive `
-        -LiteralPath $packageDirectory `
-        -DestinationPath $assetPath `
-        -CompressionLevel Optimal
+    $createdOutput = $true
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [IO.Compression.ZipFile]::Open($assetPath, "Create")
+    try {
+        foreach ($file in Get-ChildItem -LiteralPath $packageDirectory -Recurse -File) {
+            $entryName = $file.FullName.Substring($stagingRoot.Length + 1).Replace("\", "/")
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $archive, $file.FullName, $entryName, [IO.Compression.CompressionLevel]::Optimal)
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
 
-    $hash = Get-FileHash -LiteralPath $assetPath -Algorithm SHA256
-    $checksumLine = "$($hash.Hash.ToLowerInvariant())  $assetFileName`n"
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($assetPath)
+    try {
+        $digest = [BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $stream.Dispose()
+        $sha256.Dispose()
+    }
+    $checksumLine = "$digest  $assetFileName`n"
     [IO.File]::WriteAllText($checksumPath, $checksumLine, $utf8NoBom)
 
     $manifest = [ordered]@{
@@ -100,12 +141,13 @@ try {
         pluginName = "UnrealToolsetsExtension"
         pluginVersion = $pluginVersion
         sourceCommit = $SourceCommit.ToLowerInvariant()
-        engineVersion = $EngineVersionLabel
-        targetPlatforms = @($TargetPlatforms -split "\+" | Where-Object { $_ })
+        engineVersion = $engineLabel
+        engineChangelist = $buildVersion.Changelist
+        targetPlatforms = $platforms
         assets = @(
             [ordered]@{
                 file = $assetFileName
-                sha256 = $hash.Hash.ToLowerInvariant()
+                sha256 = $digest
             }
         )
     }
@@ -113,7 +155,7 @@ try {
     [IO.File]::WriteAllText($manifestPath, "$manifestJson`n", $utf8NoBom)
 }
 catch {
-    if (Test-Path -LiteralPath $resolvedOutput -PathType Container) {
+    if ($createdOutput -and (Test-Path -LiteralPath $resolvedOutput -PathType Container)) {
         $outputParent = [IO.Path]::GetDirectoryName($resolvedOutput)
         $resolvedParent = [IO.Path]::GetFullPath($outputParent)
         if (-not $resolvedOutput.StartsWith(
@@ -127,7 +169,7 @@ catch {
     throw
 }
 finally {
-    if (Test-Path -LiteralPath $stagingRoot -PathType Container) {
+    if ($createdStage -and (Test-Path -LiteralPath $stagingRoot -PathType Container)) {
         $expectedStaging = "$resolvedOutput.staging"
         $resolvedStaging = (Resolve-Path -LiteralPath $stagingRoot).Path
         if ($resolvedStaging -ne $expectedStaging) {
@@ -139,4 +181,4 @@ finally {
 
 Write-Output "GitHub Release assets prepared: $resolvedOutput"
 Write-Output "Asset: $assetFileName"
-Write-Output "SHA256: $($hash.Hash)"
+Write-Output "SHA256: $digest"

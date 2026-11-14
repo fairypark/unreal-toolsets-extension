@@ -157,9 +157,52 @@ namespace FabExtensionToolsetPrivate
 		return nullptr;
 	}
 
+	// Optional official module: inspect only already-loaded reflection. Never load the
+	// module, create its default object, dispatch a function, or initialize a session.
+	void InspectOfficialFabTools(FFabExtensionLibraryCapability& Result)
+	{
+		Result.bOfficialToolsetModuleLoaded =
+			FModuleManager::Get().IsModuleLoaded(TEXT("FabToolset"));
+		const UClass* OfficialClass = FindObject<UClass>(
+			nullptr, TEXT("/Script/FabToolset.FabToolset"));
+		Result.bOfficialToolsetClassPresent = OfficialClass != nullptr;
+		if (!Result.bOfficialToolsetModuleLoaded || OfficialClass == nullptr
+			|| !OfficialClass->IsChildOf(UToolsetDefinition::StaticClass()))
+		{
+			return;
+		}
+
+#if WITH_METADATA
+		const FName FunctionNames[] = {
+			TEXT("SearchFabMyLibrary"),
+			TEXT("SearchFabListings"),
+			TEXT("GetFabListingDetails")
+		};
+		for (const FName FunctionName : FunctionNames)
+		{
+			const UFunction* Function = OfficialClass->FindFunctionByName(FunctionName);
+			if (Function == nullptr || !Function->HasAnyFunctionFlags(FUNC_Static)
+				|| !Function->HasMetaData(TEXT("AICallable"))
+				|| Function->HasMetaData(TEXT("AIIgnore")))
+			{
+				continue;
+			}
+			// ToolsetRegistry qualifies C++ toolsets as Module.Class.Function.
+			const FString QualifiedName =
+				TEXT("FabToolset.") + OfficialClass->GetName() + TEXT(".") + Function->GetName();
+			Result.OfficialReflectedToolNames.Add(QualifiedName);
+			if (FunctionName == FName(TEXT("SearchFabMyLibrary")))
+			{
+				Result.RecommendedOwnedLibraryTool = QualifiedName;
+			}
+		}
+#endif
+	}
+
 	FFabExtensionLibraryCapability BuildFabLibraryCapability()
 	{
 		FFabExtensionLibraryCapability Result;
+		InspectOfficialFabTools(Result);
 
 		const TSharedPtr<IPlugin> FabPlugin =
 			IPluginManager::Get().FindPlugin(TEXT("Fab"));
@@ -555,7 +598,7 @@ UFabExtensionToolset::RequestFabOwnedLibrarySync(const int32 BatchSize)
 		RaiseError(
 			TEXT("FAB_EXTENSION_LIBRARY_UNAVAILABLE"),
 			FString::Printf(
-				TEXT("Owned-library search prototype is unavailable with capability status %d."),
+				TEXT("Owned-library search prototype is unavailable with capability status %d. Legacy snapshot operations require UE 5.8/Fab 14. On UE 5.9, inspect GetFabOwnedLibrarySearchCapability and prefer the reported official FabToolset.FabToolset.SearchFabMyLibrary if exposed by the host; reflection presence does not prove login or network success."),
 				static_cast<int32>(Capability.Status)));
 		return Result;
 	}
@@ -604,7 +647,7 @@ UFabExtensionToolset::GetFabOwnedLibrarySnapshotInfo()
 		RaiseError(
 			TEXT("FAB_EXTENSION_LIBRARY_UNAVAILABLE"),
 			FString::Printf(
-				TEXT("Owned-library search prototype is unavailable with capability status %d."),
+				TEXT("Owned-library search prototype is unavailable with capability status %d. Legacy snapshot operations require UE 5.8/Fab 14. On UE 5.9, inspect GetFabOwnedLibrarySearchCapability and prefer the reported official FabToolset.FabToolset.SearchFabMyLibrary if exposed by the host; reflection presence does not prove login or network success."),
 				static_cast<int32>(Capability.Status)));
 		return Result;
 	}
@@ -649,7 +692,7 @@ UFabExtensionToolset::SearchFabOwnedAssets(
 		RaiseError(
 			TEXT("FAB_EXTENSION_LIBRARY_UNAVAILABLE"),
 			FString::Printf(
-				TEXT("Owned-library search prototype is unavailable with capability status %d."),
+				TEXT("Owned-library search prototype is unavailable with capability status %d. Legacy snapshot operations require UE 5.8/Fab 14. On UE 5.9, inspect GetFabOwnedLibrarySearchCapability and prefer the reported official FabToolset.FabToolset.SearchFabMyLibrary if exposed by the host; reflection presence does not prove login or network success."),
 				static_cast<int32>(Capability.Status)));
 		return Result;
 	}

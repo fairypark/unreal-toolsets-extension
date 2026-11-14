@@ -43,8 +43,8 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             (PLUGIN_ROOT / "UnrealToolsetsExtension.uplugin").read_text(encoding="utf-8")
         )
         self.assertTrue(descriptor["EditorOnly"])
-        self.assertEqual(4, descriptor["Version"])
-        self.assertEqual("0.4.0", descriptor["VersionName"])
+        self.assertEqual(5, descriptor["Version"])
+        self.assertEqual("0.5.0", descriptor["VersionName"])
         self.assertEqual("UnrealToolsetsExtension", descriptor["Modules"][0]["Name"])
         dependencies = {item["Name"] for item in descriptor["Plugins"]}
         self.assertIn("ToolsetRegistry", dependencies)
@@ -126,7 +126,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         )
         reflected_operations = set(
             re.findall(
-                r"UFUNCTION\(meta = \(AICallable\).*?\)\s+"
+                r"UFUNCTION\(meta = \(AICallable\b[^)]*\).*?\)\s+"
                 r"static\s+[\w:<>,*&\s]+\s+(\w+)\s*\(",
                 public_headers,
                 re.DOTALL,
@@ -200,7 +200,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "SaveLandscape",
         ):
             self.assertIn(f"{tool_name}(", header)
-        self.assertEqual(13, header.count("meta = (AICallable)"))
+        self.assertEqual(13, header.count("meta = (AICallable"))
 
         placement_header = (
             PLUGIN_ROOT
@@ -210,7 +210,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             / "PlacementExtensionToolset.h"
         ).read_text(encoding="utf-8")
         self.assertIn("SnapActorToGround(", placement_header)
-        self.assertEqual(1, placement_header.count("meta = (AICallable)"))
+        self.assertEqual(1, placement_header.count("meta = (AICallable"))
 
     def test_snap_to_ground_contract_is_diagnostic_and_self_safe(self):
         header = (
@@ -259,7 +259,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("CaptureCameraToPng(", header)
         self.assertIn("VerifyEvidenceForSupervision(", header)
-        self.assertEqual(2, header.count("meta = (AICallable)"))
+        self.assertEqual(2, header.count("meta = (AICallable"))
         for required in (
             "ACameraActor* CameraActor",
             "ACameraActor* ExpectedCameraActor",
@@ -328,7 +328,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "AuditGraphInstance",
         ):
             self.assertIn(f"{function_name}(", header)
-        self.assertEqual(7, header.count("meta = (AICallable)"))
+        self.assertEqual(7, header.count("meta = (AICallable"))
         self.assertIn("UPCGMeshSelectorWeighted", implementation)
         self.assertIn("ForEachConstManagedResource", implementation)
         self.assertIn("GetHeightAtLocation", implementation)
@@ -358,7 +358,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "SetGrassDensityScaling",
         ):
             self.assertIn(f"{function_name}(", header)
-        self.assertEqual(7, header.count("meta = (AICallable)"))
+        self.assertEqual(7, header.count("meta = (AICallable"))
         self.assertIn("FScopedTransaction", implementation)
         self.assertIn("MarkPackageDirty", implementation)
         self.assertNotIn("SavePackage", implementation)
@@ -390,7 +390,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
             "SearchFabOwnedAssets",
         ):
             self.assertIn(f"{function_name}(", header)
-        self.assertEqual(9, header.count("meta = (AICallable)"))
+        self.assertEqual(9, header.count("meta = (AICallable"))
         for public_surface in (
             "Utilities/FabAssetsCache.h",
             "FabWorkflowFactoryRegistry.h",
@@ -468,11 +468,11 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         for required in (
             'ValidatePattern("^[0-9a-fA-F]{40}$")',
-            "UnrealToolsetsExtension-$pluginVersion-$safeEngineLabel-$safePlatforms",
-            "Get-FileHash -LiteralPath $assetPath -Algorithm SHA256",
-            '"release-manifest.json"',
+            "EngineVersionLabel must match the installed build",
+            "$sha256.ComputeHash($stream)",
+            '"$assetBaseName.manifest.json"',
             "sourceCommit = $SourceCommit.ToLowerInvariant()",
-            "engineVersion = $EngineVersionLabel",
+            "engineVersion = $engineLabel",
             "SourceCommit does not match repository HEAD",
             "Refusing to build GitHub Release assets from a dirty working tree",
         ):
@@ -484,7 +484,7 @@ class UnrealExtensionDistributionTests(unittest.TestCase):
         )
         for required in (
             "unreal-toolsets-extension",
-            "unreal-toolsets-v0.4.0",
+            "unreal-toolsets-v0.5.0",
             "Claude, Codex, and other MCP users",
             "protected tags",
             "Never run untrusted pull-request code",

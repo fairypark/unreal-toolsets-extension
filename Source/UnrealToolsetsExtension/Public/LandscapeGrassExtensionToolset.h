@@ -153,39 +153,39 @@ class ULandscapeGrassExtensionToolset : public UToolsetDefinition
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(meta = (AICallable), Category = "LandscapeGrassExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "LandscapeGrassExtensionToolset")
 	static TArray<FLandscapeGrassVariety> GetGrassVarieties(
 		ULandscapeGrassType* GrassType);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeGrassExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeGrassExtensionToolset")
 	static FLandscapeGrassMutation ReplaceGrassVarieties(
 		ULandscapeGrassType* GrassType,
 		const TArray<FLandscapeGrassVarietyRequest>& Varieties);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeGrassExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeGrassExtensionToolset")
 	static FLandscapeGrassMutation AddGrassVariety(
 		ULandscapeGrassType* GrassType,
 		const FLandscapeGrassVarietyRequest& Variety,
 		int32 InsertIndex = -1);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeGrassExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeGrassExtensionToolset")
 	static FLandscapeGrassMutation UpdateGrassVariety(
 		ULandscapeGrassType* GrassType,
 		int32 Index,
 		const FLandscapeGrassVarietyRequest& Variety);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeGrassExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeGrassExtensionToolset")
 	static FLandscapeGrassMutation RemoveGrassVariety(
 		ULandscapeGrassType* GrassType,
 		int32 Index);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeGrassExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeGrassExtensionToolset")
 	static FLandscapeGrassMutation ReorderGrassVariety(
 		ULandscapeGrassType* GrassType,
 		int32 FromIndex,
 		int32 ToIndex);
 
-	UFUNCTION(meta = (AICallable), Category = "LandscapeGrassExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "LandscapeGrassExtensionToolset")
 	static FLandscapeGrassMutation SetGrassDensityScaling(
 		ULandscapeGrassType* GrassType,
 		bool bEnableDensityScaling);

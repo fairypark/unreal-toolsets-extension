@@ -91,7 +91,7 @@ public:
 	 * Snaps an Actor to a traced surface while ignoring the Actor's own
 	 * components. Supports negative world heights and reports the selected hit.
 	 */
-	UFUNCTION(meta = (AICallable), Category = "PlacementExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Write"), Category = "PlacementExtensionToolset")
 	static FPlacementExtensionSnapResult SnapActorToGround(
 		AActor* Actor,
 		const FPlacementExtensionSnapRequest& Request);

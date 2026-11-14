@@ -131,6 +131,6 @@ class UObservabilityExtensionToolset : public UToolsetDefinition
 
 public:
 	/** Returns the versioned operation and safe-error catalog for this plugin. */
-	UFUNCTION(meta = (AICallable), Category = "ObservabilityExtensionToolset")
+	UFUNCTION(meta = (AICallable, AIAccessMode = "Read"), Category = "ObservabilityExtensionToolset")
 	static FUnrealToolsetsExtensionObservabilityInfo GetExtensionObservabilityInfo();
 };

@@ -69,19 +69,25 @@ prototype:
 The prototype is restricted to Unreal Engine 5.8 and Fab plugin version
 `0.0.14` (`Version` 14). It submits Fab's internal TEDS My Library command and
 reads only reflected product metadata. The current Editor process must already
-have an active Fab login session; Fab does not expose a public headless login
-initializer. The prototype never reads or exposes credentials, account ids,
+have an active Fab login session; that legacy Fab version does not expose a
+public headless login initializer. The prototype never reads or exposes credentials, account ids,
 cookies, or signed download URLs. Because the internal command has no public
 completion signal, callers must poll the snapshot count until it stabilizes and
 results always report that completeness is unknown.
 
-Download initiation remains in Epic's Fab window. A client can record the
+The extension does not initiate downloads. For the legacy workflow, download
+initiation remains in Epic's Fab window. A client can record the
 current Unix time, ask the user to click Download, and then poll
 `ListFabCachedEntries` with `ModifiedAfterUnixSeconds` to detect newly completed
 top-level ZIP cache entries without further screen control. Some native Unreal
 content uses an install/Add to Project path instead of the ZIP cache; those
 artifacts must be verified in the destination project rather than inferred from
 this cache tool.
+
+On UE 5.9, prefer Epic's official `FabToolset.FabToolset` search operations.
+The extension's capability report passively identifies their reflected names;
+it does not authenticate or call the service. The legacy private-schema gate
+remains unchanged. See `docs/FAB_HEADLESS_PROTOTYPE.md` for migration details.
 
 `ObservabilityExtensionToolset` exposes client-neutral, read-only metadata:
 
@@ -120,17 +126,30 @@ that provenance and integrity gap; it deliberately does not judge composition
 or visual quality. See `docs/VISUAL_EVIDENCE_TOOLSET.md` for the addition
 rationale, workflow, guarantees, and limits.
 
+## Engine compatibility
+
+Version 0.5.0 provides a Win64 Editor ZIP for UE 5.8.4 (CL 58902052) and
+a separate experimental ZIP for UE 5.9.0 Preview (CL 60351404). Match the
+version and changelist shown in the Editor's About dialog to the ZIP name.
+See [the compatibility notes](docs/UE59_COMPATIBILITY.md) for the official
+Fab migration path and test coverage.
+
+Existing extension toolset and operation names remain unchanged. Official
+Editor tool names and MCP discovery changed in UE 5.9; see
+`docs/MCP_COMPATIBILITY.md` before adapting external workflows.
+
 ## Requirements
 
-- Unreal Engine 5.8.1 for version `0.4.0`
+- one of the two Win64 Editor builds listed above
 - the experimental `ToolsetRegistry` plugin
 - the built-in `PCG` plugin
 - the built-in `Fab` plugin
 - an Editor target
 
-Win64 packaging was verified with Unreal Engine 5.8. Other Engine versions and
-platforms require their own clean build and live test before being declared
-supported.
+Win64 is the validation target. Other Engine builds and platforms require
+their own clean build and live test before being declared supported. Preview
+compatibility does not establish compatibility with later Preview or final
+releases.
 
 `AllToolsets` and `ModelContextProtocol` are not build dependencies. A project
 needs `ModelContextProtocol` only when it wants to expose registered toolsets
@@ -138,8 +157,9 @@ over MCP.
 
 ## Connect this source workspace to Unreal MCP
 
-The three tool-search operations `list_toolsets`, `describe_toolset`, and
-`call_tool` belong to Unreal Engine's `ModelContextProtocol` plugin. They are
+The tool-search operations `list_toolsets`, `describe_toolset` (UE 5.8),
+`describe_toolsets` and `describe_tools` (UE 5.9), and `call_tool` belong to
+Unreal Engine's `ModelContextProtocol` plugin. They are
 not implemented by this extension. Codex only sees them when the workspace
 being opened contains an MCP client configuration that points to the running
 Editor.
@@ -165,10 +185,9 @@ The connection can be verified without driving the Editor UI:
   -RequiredOperationNames CaptureCameraToPng,VerifyEvidenceForSupervision
 ```
 
-The test initializes an MCP session and fails unless `tools/list` returns all
-three tool-search meta-tools. When a Toolset is supplied, it also fails unless
-`describe_toolset` exposes every required operation. It never reads or prints
-credentials, cookies, or session identifiers.
+The test initializes an MCP session and detects the available tool-search
+protocol. It also verifies every requested operation against the live schema.
+It never reads or prints credentials, cookies, or session identifiers.
 
 ## Build a distributable package
 
@@ -219,8 +238,7 @@ different Engine version.
 - Landscape mutations require an explicit editable Landscape edit-layer GUID.
 - Heightmap and weightmap imports require an exact full-Landscape resolution.
 - Mutations refuse regions with unloaded World Partition components.
-- `CreateLandscape` currently refuses World Partition worlds because version
-  `0.4.0` does not create streaming proxies.
+- `CreateLandscape` requires a world with World Partition disabled.
 - Reimport validates the recorded source, saves a recovery point, captures the
   original height data, verifies the complete write plus representative points,
   and rolls back on failure.
