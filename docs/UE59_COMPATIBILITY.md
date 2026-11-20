@@ -3,6 +3,10 @@
 Version 0.5.0 includes experimental UE 5.9 Preview support. Its two Win64
 packages identify the exact engine patch and changelist in their filenames.
 
+## Preview 2 (CL 60738873)
+
+The 0.5.0 tag builds with Win64 BuildPlugin on UE 5.9.0 Preview 2. The resulting Editor module reports BuildId `60738873`. Use a package built for that CL when upgrading from `60351404`. Preview 2 ships Fab 0.0.23. Its headers retain `SearchFabMyLibrary` and opaque cursor pagination.
+
 ## Compatibility contract
 
 - Retain all 40 extension operation names and their typed request/result
